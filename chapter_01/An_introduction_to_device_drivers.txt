@@ -1,0 +1,22 @@
+1. Split of mechanism and policy:
+• Mechanism: WHAT capabilities are to be provided.
+• Policy: HOW those capabilities can be used.
+
+The driver should deal with making the hardware available, leaving all the issues about how to use the hardware to the application. 
+
+2. Splitting the kernel:
+i) Process management; ii) memory management; iii) filesystems; iv) device control; v) networking.
+
+3. Three types of devices:
+i)   Character devices:
+The only relevant difference between a char device and a regular file is that: you can always move back and forth in the regular file, whereas most char devices can only be accessed sequentially.
+ii)  Block devices:
+
+iii) Network interfaces:
+A network driver knows nothing about individual connections, it only handles packets. The unix way to provide access to interfaces is still by assigning a unique name to them (like eth0), but the name doesn't have a corresponding entry in the filesystem. Instead of read and write, the kernel calls functions related to packet transmission.
+
+4. Security issues:
+Any security check in the system is enforced by kernel code.
+
+Documentation/Changes --> Require tools/versions needed to build the kernel.
+COPYING --> GPL licence file.

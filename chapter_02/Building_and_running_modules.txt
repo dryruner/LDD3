@@ -1,0 +1,25 @@
+• insmod and rmmod should be called using sudo or as root. Note that the printk() output of _init and _exit function could only be seen from text console, in a terminal emulator running under the window system maybe you cannot see the output. But it should be in /var/log/messages or /var/log/syslog, or through dmesg.
+• Linux kernel code, including driver code, must be reentrant - it must be capable of running in more than one context at the same time.
+• Functions with a double underscore (__) in kernel API should be used with caution.
+• Kernel code cannot do floating point arithmetic.
+
+1. Compiling and Loading modules:
+This could also refer to the notes of LKD chapter_17. For here, we just focus on compiling modules outside the kernel source tree.
+obj-m := hello.o (= 最基本的赋值；:= 覆盖之前的赋值；?= 如果之前没有被赋值过就赋值; += 添加等号后面的值)
+If your kernel source tree is located in, say, ~/kernel-2.6/ directory, and assuming you're currently in the module's directory which contains its own makefile and outside kernel source tree, do:
+	$ make -C ~/kernel-2.6 M=`pwd` modules; ($ make modules; is to build the modules.)
+This commands starts by changing its directory to the one proviced with the -C option, it then finds the kernel's top-level Makefile. The 'M=' option causes that Makefile to move back to the module source directory before trying to build the modules target. This target, in turn, refers to the list of modules found in obj-m variable.
+* Another Makefile that does the same but just need to do $ make:
+==========================================================
+ifneq ($(KERNELRELEASE),)
+	obj-m := hello.o
+else
+	KERNEL_DIR ?= /lib/modules/$(shell uname -r)/build
+	PWD := $(shell pwd)
+
+	default:
+		$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
+
+endif
+==========================================================
+Call chain: make -> else -> default -> Makefile in kernel source tree, where defines KERNELRELEASE -> back to module dir -> Makefile in module dir -> obj-m := hello.o.

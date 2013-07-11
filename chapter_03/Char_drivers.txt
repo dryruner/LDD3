@@ -103,4 +103,43 @@ i)  Deallocate anything that open allocated in filp->private_data;
 ii) Shut down the device on last close. (Note that not every close syscall causes the release method to be invoked.)
 
 6. Read and write:
+	ssize_t read(struct file* filp, char __user *buff, size_t count, loff_t* offp);
+	ssize_t write(struct file* filp, const char __user *buff, size_t count, loff_t* offp);
+Note that the buff argument to the read/write methods is a user-space pointer. Here're some functions that could perform data transfers between kernel and user space in a safe and correct way. Defined in <asm/uaccess.h>:
+	unsigned long copy_to_user(void __user *to, const void *from, unsigned long count);
+	unsigned long copy_from_user(void *to, const void __user *from, unsigned long count);
+* Note that copy_to_user() and copy_from_user() may block because user page may not in memory, so the virtual memory subsystem can put the process to sleep while the page is being transfered into place.
+* So the result for driver writer is that any function that access user space must be reentrant, must be able to execute concurrently with other driver functions, and inparticular, must be in a position where it can legally sleep.
+* These two functions also check whether the user-space pointers are valid or not. So if you don't need to check the user-space pointer you can just invoke:
+	__copy_to_user() and __copy_from_user().
+* read() method should invoke copy_to_user(), because read from (device) file; write() method should invoke copy_from_user() because write to (device) file.
+* read/write method should update the *offp to represent the current file position after successful completion of the system call. The kernel then propagates the file position change back into the struct file when appropriate.
 
+i)  The read() method:
+Return value of read() could be:
+• return_value == count passed to the read syscall; this is the optimal case.
+• return_value > 0, but return_value != count; only part of the data is transferred.
+• return_value == 0, EOF reaches.
+• return_value < 0; there was an error. <linux/errno.h>
+Another situation is: there's no data, but it may arrive later. In this case, the read syscall should block. Blocking I/O will be dealt with in chapter 6.
+
+ii) The write() method:
+Return value of write() could be:
+• return_value == count; perfectly.
+• return_value > 0, but return_value != count, only partially write. The program will most likely retry writing the rest of the data.
+• return_value == 0, nothing is writen, the retult is not an error, and there's no reason to return an error code. (Blocking write)
+• return_value < 0, error occurred.
+
+iii) readv and writev:
+	ssize_t (*readv)(struct file* filp, const struct iovec* iov, unsigned long count, loff_t* ppos);
+	ssize_t (*writev)(struct file* filp, const struct iovec* iov, unsigned long count, loff_t* ppos);
+If the driver doesn't provide methods to handle the vector operations, readv and writev are implemented with multiple calls to read and write methods.
+Defined in <linux/uio.h>:
+=================================
+struct iovec{
+	void __user *iov_base;
+	__kernel_size_t iov_len;
+};
+=================================
+Each iovec describes one chunk of data to be transferred; it starts at iov_base in user space and is iov_len bytes long. The count parameter tells how many iovec structures there are. 
+* Note that these iovec structures are created by the application, but the kernel copies them into kernel space before calling the driver.

@@ -87,6 +87,8 @@ Note that cdev_add() may fail, and as soon as cdev_add() returns, the device is 
 The old way to register a char device is with:
 	int register_chrdev(unsigned int major, const char* name, struct file_operations* fops);
 Note that we don't pass in minor number to register_chrdev(); this is because the kernel doesn't care about the minor number, only our driver uses it.
+If 0 is passed to the @major field in register_chrdev(), the return value will be the dynamically allocated major number. The downside is that you can't make a device file in advance, since you don't know what the major number will be. There are a couple of ways to do this. i) the driver itself can print the newly assigned number and we can make the device file by hand. ii) the newly registered device will have an entry in /proc/devices, and we can either make the device file by hand or write a shell script to read the file in and make the device file. iii) we can have our driver make the the device file using the mknod system call after a successful registration and rm during the call to cleanup_module.
+
 If you use the old way, the proper way to remove the device is:
 	int unregister_chrdev(unsigned int major, const char* name);
 

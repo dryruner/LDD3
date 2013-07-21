@@ -90,7 +90,11 @@ Note that we don't pass in minor number to register_chrdev(); this is because th
 If 0 is passed to the @major field in register_chrdev(), the return value will be the dynamically allocated major number. The downside is that you can't make a device file in advance, since you don't know what the major number will be. There are a couple of ways to do this. i) the driver itself can print the newly assigned number and we can make the device file by hand. ii) the newly registered device will have an entry in /proc/devices, and we can either make the device file by hand or write a shell script to read the file in and make the device file. iii) we can have our driver make the the device file using the mknod system call after a successful registration and rm during the call to cleanup_module.
 
 If you use the old way, the proper way to remove the device is:
-	int unregister_chrdev(unsigned int major, const char* name);
+	void unregister_chrdev(unsigned int major, const char* name);
+
+• There's a counter keeps track of how many processes are using this module; it is listed in /proc/modules file, the third column. If this number isn't zero, rmmod will fail. You shouldn't use this counter directly, but here's function in <linux/module.h> to let you increase, decrease and display this counter:
+	try_module_get(THIS_MODULE);  // Increase the use count
+	module_put(THIS_MODULE);      // Decrease the use count
 
 5. Open and release:
 • The open method:

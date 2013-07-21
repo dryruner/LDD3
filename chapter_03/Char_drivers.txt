@@ -67,6 +67,9 @@ Note that kernel provides two macros to obtain the major and minor number from a
 	unsigned int iminor(struct inode* inode);
 	unsigned int imajor(struct inode* inode);
 
+• Note:
+In the proc_dir_entry definition, it includes both file_operations and inode_operations. The difference is that file_operations deals with the file itself, like it has the methods read, write, llseek, etc; inode_operations deals with the ways to access the file, like it has the methods mkdir, unlink, permission, getattr, etc.
+
 4. Char device registration:
 The kernel uses struct cdev (defined in <linux/cdev.h>) to represent char devices. So before the kernel could invoke your device's operations, you must allocate and register one or more of these structures.
 There're 2 ways to allocate and initialize it:

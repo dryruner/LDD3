@@ -1,0 +1,14 @@
+1. Debugging support in the kernel:
+See LDD3 p73 for more details. Some of the important configurations are listed below: 
+• CONFIG_DEBUG_SLAB: each byte of allocated memory is set to 0xa5 before being handled to the caller, and then set to 0x6b when it is freed. (These poison values are useful when debugging)
+• CONFIG_DEBUG_SPINLOCK_SLEEP: This option enables a check for attempts to sleep while holding a spinlock. In fact, it complains if you call a function that could potentially sleep, even if the call in question would not sleep..
+• CONFIG_DEBUG_STACK_USAGE, CONFIG_DEBUG_STACKOVERFLOW: A sure sign of a stack overflow is an oops listing without any sort of reasonable back trace.
+• CONFIG_IKCONFIG, CONFIG_IKCONFIG_PROC: These options cause the full kernel configuration state to be built into the kernel and to be made available via /proc. (In "general setup" menu)
+• CONFIG_DEBUG_DRIVER: Turn on debugging information in the driver core.
+• CONFIG_PROFILING: (found under "Profiling support") 
+
+2. Debugging by printing:
+• printk() doesn't flush until a trailing newline is provided. 
+• A printk() with no specified priority defaults to DEFAULT_MESSAGE_LOGLEVEL specified in kernel/printk.c. (In 2.6 kernel, it is KERN_WARNING). /proc/kmsg.
+• The variable console_loglevel is initialized to DEFAULT_CONSOLE_LOGLEVEL and can be modified through the sys_syslog syscall.
+• It's also possible to read and modify the console loglevel using the text file /proc/sys/kernel/printk. This file contains 4 integer values: "current_loglevel	default_loglevel(for msgs that lack an explicit loglevel)	minimum_allowed_loglevel	boot-time_default_loglevel". Writing a single value to this file changes the current loglevel to that value. (Thus you can cause all kernel msgs to appear at the console simply by: "echo 8 > /proc/sys/kernel/printk".)

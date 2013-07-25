@@ -73,3 +73,17 @@ The 2nd argument is the name of the core file. Like any file in /proc, /proc/kco
 				-s .data XXXXXXXX
 
 But we still cannot perform typical debugging tasks like setting breakpoints or modifying data. To perform those operations, we need to use a tool like kdb or kgdb.
+
+7. Other tools:
+• The kdb debugger:
+kdb works only on IA-32(x86) systems. Note that everything the kernel does stops when kdb is running. See p102.
+• The kgdb patches:
+There are two seperate patches. They work by seperating i) the system running the test kernel from ii) the system running the debugger. These two are typically connected via a serial cable. In addition to the serial port, kgdb can also communicate over a local-area network. The documentation under Documentation/i386/kgdb describes how to set things up.
+kgdb patch could also be found on http://kgdb.sf.net/
+• The User-Mode linux port:
+User-Mode Linux (UML) doesn't run on a new type of hardware; instead, UML allows the Linux kernel to run as a separate, user-mode process on a linux system. This allows gdb to debug in user-space, because it is just another process. The only shortcoming may be for the driver writer because UML couldn't access the host system's hardware.
+See http://user-mode-linux.sf.net for more information.
+• The Linux Trace Toolkit (LTT)
+See http://www.opersys.com/LTT
+• Dynamic Probes (DProbes):
+DProbes is a debugging tool released by IBM for linux on the IA-32 architecture. See http://oss.software.ibm.com

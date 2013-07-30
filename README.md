@@ -2,3 +2,4 @@
 * Chapter 2: Building and Running Modules
 * Chapter 3: Char Drivers
 * Chapter 4: Debugging Techniques
+* Chapter 5: Concurrency and Race Conditions

@@ -109,4 +109,110 @@ The actual behavior when a process is awakened is controlled by a function in th
 	void wake_up_interruptible_sync(wait_queue_head_t *queue): Normally, a process that is awakened may preempt the current process and be scheduled into the processor before wake up returns. (In short, a call to wake_up may not be atomic.) If the process calling wake_up is running in an atomic context (if holds a spinlock, or is an interrupt handler), this rescheduling doesn't happen. Normally that protection is adequate. If, however, you need to explicitly ask not to be scheduled out of the processor at this time, you can use this "_sync" version. It is most often used when the caller is about to reschedule anyway, and it is more efficient to simply finish what little work remains first.
 
 • poll and select:
+Applications that use nonblocking I/O often use the poll, select, and epoll syscall. They allow a process to determine whether it can read or write to one or more open files without blocking. These calls can also block a process until any of a given set of file descriptors becomes available for reading or writing. Therefore they are often used in applications that must use multiple input or output streams without getting stuck on any one of them.
+* The support for any of these three calls require support from the device driver. Kernel support these three through a function in file_operations structure:
+	unsigned int (*poll)(struct file *filp, poll_table *wait);
+The device method (poll() method provided by the driver code) is in charge of these two steps:
+i)  Call poll_wait() on one or more wait queues that could indicate a change in the poll status.
+ii) Return a bit mask describing the operations that could be immediately performed without blocking. (For example, if the device has data available, a read would complete without sleeping; the poll method should indicate this state of affairs.)
 
+The driver adds a wait queue to the poll_table structure by calling the function poll_wait():
+	void poll_wait(struct file *, wait_queue_head_t *, poll_table *);
+Several flags are used to indicate the possible operations:
+POLLIN:       This bit must be set if the device can be read without blocking.
+POLLRDNORM:   This bit must be set if "normal" data is available for reading. A readable device returns (POLLIN | POLLRDNORM).
+POLLDBAND:    This bit indicates that out-of-band data is available for reading from the device. This bit is not generally applicable to device drivers.
+POLLPRI:      High-priority data (out of band) can be read without blocking. 
+POLLHUP:      When a process reading this device sees end-of-file, the driver must set POLLHUP. 
+POLLERR:      An error condition has occurred to the device.
+POLLOUT:      This bit is set in the return value, if the device can be written to without blocking.
+POLLWRNORM:   A writable device returns (POLLOUT | POLLWRNORM).
+POLLWRBAND:   Like POLLRDBAND, this bit is seldom (never) used by normal drvice drivers.
+• Note that POLLRDBAND and POLLWRBAND are meaningful only with file descriptors associated with sockets; device drivers won't normally use these flags.
+
+* Interaction with read and write:
+i)  Reading data from the device:
+If there's data in the input buffer, the read call should return immediately, even if less data is available than the application requested. If there's no data is in the input buffer, by default read must block until there's at least 1 byte there. If O_NONBLOCK is set, read returns immediately with a return value of -EAGAIN. In these cases, poll must report that the device is unreadable until at least one byte arrives. If we're at EOF, read should return immediately with a return value of 0, independent of O_NONBLOCK. poll() should report POLLHUP in this case.
+ii) Writing to the device:
+Essentially the same as read. And never make a write call wait for data transmission before returning, even if O_NONBLOCK is clear. If the program wants to ensure that the data it enqueues in the output buffer is actually transmitted, the driver must provide a fync() method.
+
+* The underlying data structures:
+Whenever a user application calls poll, select, or epoll, the kernel invokes the poll method of all files referenced by the syscall, passing the same poll_table to each of them. The poll_table is a wrapper around a function that builds the actual data structure. The structure, for select and poll, is a linked list of memory pages containing poll_table_entry structures. Each poll_table_entry holds the struct file and wait_queue_head_t pointers passed to poll_wait(), along with an associated wait queue entry. 
+• The driver's poll method may be called with a NULL pointer as poll_table paramater. Because if the application calling poll has provided a timeout value of 0 (indicating that no wait should be done), there's no to accumulate wait queues. The poll_table parameter is also set to NULL immediately after any driver being polled indicates that I/O is possible. Since the kernel knows that at this point no wait will occur, it doesn't build up a list of wait queues.
+When the poll call completes, the poll_table structure is deallocated, and all wait queue entries previously added to the poll table are removed from the table and their wait queues.
+Because there're applications that work with thousands of file descriptors. So the allocation and deallocation of this data structures between every I/O operation becomes expensive. The epoll syscall family allows setting up the internal kernel data structures exactly once and to use it many times.
+
+* Asynchronous notification:
+User programs have to execute two steps to enable asynchronous notification from an input file. i) First, they specify a process as the owner of the file. When the process invokes the F_SETOWN command using fcntl syscall, the pid of the owner process is saved in filp->f_owner, this is necessary for the kernel to know whom to notify. ii) In order to actually enable asynchronous notification, the user programs must set the FASYNC flag in the device by means of the F_SETFL fcntl command. After the two calls have been executed, the input file can request delivery of a SIGIO signal whenever new data arrives. The signal is sent to the process (or process group if the value is negative) stored in filp->f_owner.
+For example:
+	signal(SIGIO, &input_handler);
+	fcntl(STDIN_FILENO, F_SETOWN, getpid());
+	oflags = fcntl(STDIN_FILENO, F_GETFL);
+	fcntl(STDIN_FILENO, F_SETFL, oflags | FASYNC);
+Note that when a process receives a SIGIO, it doesn't know which input file has new input to offer. If more than one file is enabled to asynchronously notify a process, it may still has to resort to poll or select to find out what happened.
+
+• The driver's point of view:
+i)   When F_SETOWN is invoked, nothing happens except that a value is assigned to filp->f_owner.
+ii)  When F_SETFL is executed to turn on FASYNC, the driver's fasync method is called. This method is called whenever the value of FASYNC is changed in filp->f_flags to notify the driver of the change. The flag is cleared by default when the file is opened.
+iii) When data arrives, all the processes registered for asynchronous notification must be sent a SIGIO signal.
+<linux/fs.h> defines the data structure fasync_structure and two functions:
+	int fasync_helper(int fd, struct file *filp, int mode, struct fasync_struct **fa);
+	void kill_fasync(struct fasync_struct **fa, int sig, int band);
+fasync_helper() is invoked to add or remove entries from the list of interested processes when the FASYNC flag changes for an open file. kill_fasync() is used to signal the interested process when data arrives. Its arguments are the signal to send (usually SIGIO) and the band (always POLL_IN, but may be used to send "urgent" or out-of-band data in the networking code)  (POLL_IN and POLL_OUT are symbols used in asynchronous notification code.)
+• Note that we must invoke our fasync method when the file is closed to remove the file from the list of active asynchronous readers. Although this call is required only if filp->f_flags has FASYNC set, calling the function anyway doesn't hurt and is the usual implementation:
+	scull_p_fasync(-1, filp, 0);
+The data structure underlying asynchronous notification is almost identical to the structure struct wait_queue; the difference is that struct file is used in place of struct task_struct.
+
+
+3. Seeking a device:
+If seeking a device doesn't make any sense, you must inform the kernel, because the default llseek method allows seeking. You should inform the kernel that your device doesn't support seeking by i) calling nonseekable_open() in the open method; ii) set .llseek = no_llseek. See scull source for more references.
+
+4. Access control on a device file:
+i)   Single-open devices:
+The brute-force way to permit a device to be opened by only one process at a time. (Using atomic_t type as a use-count.)
+ii)  Restricting access to a single user at a time: for example:
+========================================================================
+spin_lock(&scull_u_lock);
+if(scull_u_count && 
+		(scull_u_owner != current->uid) &&  /* allow user */
+		(scull_u_owner != current->euid) && /* allow whoever did su */
+		!capable(CAP_DAC_OVERRIDE)) {  /* still allow root */
+	spin_unlock(&scull_u_count);
+	return -EBUSY; /* -EPERM would confuse the user */
+}
+if(scull_u_count == 0)
+	scull_u_owner = current->pid;
+scull_u_count++;
+spin_unlock(&scull_u_lock);
+========================================================================
+• Blocking open as an alternative to EBUSY:
+When the device isn't accessible, return an error is usually the most sensible approach, but there're situations in which user would prefer to wait for the device. For example:
+========================================================================
+spin_lock(&scull_w_lock);
+while(!scull_w_available()) {
+	spin_unlock(&scull_w_lock);
+	if(filp->f_flags & O_NONBLOCK)
+		return -EAGAIN;
+	if(wait_event_interruptible(scull_w_wait, scull_w_available()))
+		return -ERESTARTSYS;
+	spin_lock(&scull_w_lock);
+}
+if(scull_w_count == 0)
+	scull_w_owner = current->uid;
+scull_w_count++;
+spin_unlock(&scull_w_lock);
+========================================================================
+static int scull_w_release(struct inode *inode, struct file *filp)
+{
+	int temp;
+	spin_lock(&scull_w_lock);
+	scull_w_count--;
+	temp = scull_w_count;
+	spin_unlock(&scull_w_lock);
+	if(temp == 0)
+		wake_up_interruptible_sync(&scull_w_wait);   // awake another uid
+	return 0;
+}
+========================================================================
+iii) Cloning the device on open:
+Anothe technique to manage access control is to create different private copies of the device, depending on the process opening it. (This is possible only if the device is not bound to a hardware object.) The internals of /dev/tty use a similar technique in order to give its process a different "view" of what the /dev entry point represents. When copies of the device are created by the software driver, we call them virtual devices, just as virtual consoles use a single physical tty device.

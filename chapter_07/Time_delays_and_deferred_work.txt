@@ -1,0 +1,56 @@
+1. Measuring time lapses:
+Every time a timer interrupt occurs, the value of an internal kernel counter is incremented. The counter is initialized to 0 at system boot. The counter is a 64-bit variable (even on 32-bit architecture) and is called jiffies_64. However, driver writers normally access the "jiffies" variable, which is an unsigned long. (Using jiffies is usually preferred because it is faster, and access to the 64-bit jiffies_64 value are not necessarily atomic on all architectures.)
+• Sometimes you need to exchange time representations with user space programs that tend to represents time values with struct timeval and struct timespe. Kernel provides 4 helper functions to convert time values expressed as jiffies to and from those structures: (in <linux/time.h>)
+	unsigned long timespec_to_jiffies(struct timespec *value);
+	void jiffies_to_timespec(unsigned long jiffies, struct timespec *value);
+	unsigned long timeval_to_jiffies(struct timeval *value);
+	void jiffies_to_timeval(unsigned long jiffies, struct timeval *value);
+• Since access to jiffies_64 is not atomic for 32-bit processors, and you may need to use locks (like seqlock) to fetch the jiffies_64. Kernel provides a specific helper function to do the thing:
+	u64 get_jiffies_64(void);
+
+• Processor-specific registers:
+Most modern processors include a counter register which is steadily incremented once at each clock cycle. On some platforms supporting SMP, for example, the kernel depends on such a counter to be synchronized across processors. 
+The most renowed counter register is TSC (timestamp counter), introduced in x86 processors. After including <asm/msr.h>, you can use these macros:
+	rdtsc(low32, high32);
+	rdtscl(low32);
+	rdtscll(var64);
+* Kernel also provides architecture-independent function that you can use instead of rdstc: (defined in <asm/timex.h>, included by <linux/timex.h>)
+	cycles_t get_cycles(void);
+
+• Knowing the current time:
+Note that: i) jiffies is always sufficient for measuring time intervals; ii) if you need very precise measurements for short time lapses, processor-specific registers come to rescue, although they bring in serious portability issues.
+* But there's a kernel function that turns a wall-time into number of seconds since epoch (1970-01-01):
+	unsigned long mktime(unsigned int year, unsigned int mon, unsigned int day, unsigned int hour, unsigned int min, unsigned int sec);
+* void do_gettimeofday(struct timeval *tv);
+Fill in the timeval structure with seconds and milliseconds since the Epoch, with the best resolution the hardware can offer.
+* struct timespec current_kernel_time(void);
+The current time (wall time) is also available (though with jiffy granularity) from the xtime variable - a struct timespec value.
+
+
+2. Delaying execution:
+i)  Long delays:
+• Busy waiting: 
+	while (time_before(jiffies, j1))
+		cpu_relax();
+The loop is guaranteed to work because jiffies is declared as volatile by the kernel headers and therefore is fetched from memory when being accessed. Busy waiting severely degrades system performance. If you didn't configure the kernel for preemptive operation, the busy loop completely locks the processor for the duration of the delay. The scheduler never preempts a process that is running in kernel space. Still worse, if interrupts happen to be disabled when you enter the loop, jiffies won't be updated, and the while loop remains true forever. (And for this situation, running a preemptive kernel won't help either.)
+• Yielding the processor:
+	while (time_before(jiffies, j1))
+		schedule();
+This solution isn't optimal. The current process does nothing but release the CPU, but it remains in the run queue. If it is the only runnable process, the idle task never runs, so the machine load (average number of running processes) is at least 1. Another problem is that: once a process releases the processor using schedule(), there's no guarantee that it will again get the processor back anytime soon.
+• Timeouts:
+The best way to implement a delay, is usually to ask the kernel to do it for you. If the driver uses a wait queue to wait for some other event, but you also want to ensure that it runs within a certain period of time, use:
+	long wait_event_timeout(wait_queue_head_t q, condition, long timeout);
+	long wait_event_interruptible_timeout(wait_queue_head_t q, condition, long timeout);
+The timeout value is the number of jiffies to wait, not the absolute time value. If the timeout expires, the functions return 0; if the process is awakened by another event, it returns the remaining delay expressed in jiffies. (The return value is never negative, even if the delay is greater than expected because of system load.) Since the process is not in the run queue, you see no difference in behavior whether the code is run in a preemptive kernel or not.
+* signed long schedule_timeout(signed long timeout);
+Put the task to sleep until at least the specified time has elapsed. The return value is 0 unless the function returns before the given timeout has elapsed (in response to a signal). Note that schedule_timeout() requires the caller to set the current process state first:
+	set_current_state(TASK_INTERRUPTIBLE);  /* so that the scheduler won't run the current process again until the timeout places it back in TASK_RUNNING state */
+	schedule_timeout(delay);
+If you forget to change the state of the current process, a call to schedule_timeout() behaves like a call to schedule().
+
+ii) Short delays:
+	#include <linux/delay.h>
+	void ndelay(unsigned long nsecs);
+	void udelay(unsigned long usecs);
+	void mdelay(unsigned long msecs);
+

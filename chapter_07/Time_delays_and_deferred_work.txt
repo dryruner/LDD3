@@ -88,12 +88,12 @@ in_atomic() returns nonzero whenever scheduling is not allowed, this includes ha
 	void add_timer(struct timer_list *timer);  /* activates the timer to run on the current CPU */
 	int del_timer(struct timer_list *timer);
 	int mod_timer(struct time_list *timer, unsigned long expires);  /* Changes the expiration time of an already scheduled (active) timer structure; if the timer is inactive
-																	 if will be activated. */
+                                                                     if will be activated. */
 	int del_timer_sync(struct time_list *timer);  /* it guarantees that when it returns, the timer function is not running on any CPU. It is used to avoid race conditions on
-												   SMP machines, and the same as del_timer() on UP machines. Note that this function can sleep if it is called from a 
-												   nonatomic context, but busy waits in other situations. If the timer function reregister itself, the caller must first 
-												   ensure that this reregistration will not happen; this is usually accomplished by setting a "shutting down" flag, which is 
-												   checked by the timer function. */
+                                                   SMP machines, and the same as del_timer() on UP machines. Note that this function can sleep if it is called from a 
+                                                   nonatomic context, but busy waits in other situations. If the timer function reregister itself, the caller must first 
+                                                   ensure that this reregistration will not happen; this is usually accomplished by setting a "shutting down" flag, which is 
+                                                   checked by the timer function. */
 	int timer_pending(const struct timer_list *timer); /* Return a boolean whether the timer is already registered (scheduled) to run */
 • Implementation of kernel timers:
 i)   Kernel timer is based on a per-CPU data structure. struct timer_list includes a pointer to that data structure in its base field. If base is NULL, then the timer is not scheduled to run; otherwise, the pointer tells which data structure (and which CPU) runs it.
@@ -123,16 +123,16 @@ A tasklet, just like a kernel timer, is executed (in atomic mode) in the context
 
 The kernel provides a set of ksoftirq kernel threads, one per CPU, to run "software interrupt" handlers.
 	void tasklet_disable(struct tasklet_struct *t); /* The tasklet may still be scheduled with tasklet_schedule(), but its execution is deferred until it is enabled again.
-													 After calling tasklet_disable(), you can be sure that the tasklet isn't running anywhere in the system. */
+                                                       After calling tasklet_disable(), you can be sure that the tasklet isn't running anywhere in the system. */
 	void tasklet_disable_nosync(struct tasklet_struct *t); /* same as above, but don't wait for any current-running function to exit. */
 	void tasklet_enable(struct tasklet_struct *t); /* must be balanced with time of disable */
 	void tasklet_schedule(struct tasklet_struct *t); /* Schedule a tasklet for execution. If it is scheduled again before it has a chance to run, it runs only once. However,
-													  if it is scheduled while it runs, it runs again after it completes. This ensures allows a tasklet to reschedule itself
-													  */
+                                                        if it is scheduled while it runs, it runs again after it completes. This ensures allows a tasklet to reschedule itself
+                                                     */
 	void tasklet_hi_schedule(struct tasklet_struct *t); /* same as above, but schedule the tasklet with higher priority */
 	void tasklet_kill(struct tasklet_struct *t); /* This ensures that the tasklet is not scheduled to run again, always called when a device is being closed or the module 
-												  removed. If the tasklet is already scheduled to run, the function waits until it completes. If the tasklet reschedules
-												  itself, you must prevent it from rescheduling itself before calling tasklet_kill(), as with del_timer_sync(). */
+                                                  removed. If the tasklet is already scheduled to run, the function waits until it completes. If the tasklet reschedules
+                                                  itself, you must prevent it from rescheduling itself before calling tasklet_kill(), as with del_timer_sync(). */
 • Tasklets are simply linked in a linked list, because tasklets have none of the sorting requirements of kernel timers.
 
 
@@ -150,15 +150,15 @@ Each workqueue has one or more processes (kernel threads), which run functions s
 	DECLARE_WORK(name, void (*function)(void *), void *data); /* define a work */
 	INIT_WORK(struct work_struct *work, void (*function)(void *), void *data);  /* initializing the work_struct structure */
 	PREPARE_WORK(struct work_struct *work, void (*function)(void *), void *data);  /* does the same job, but it doesn't initialize the pointers used to link the work_struct 
-																					  structure into the workqueue */
+                                                                                     structure into the workqueue */
 	int queue_work(struct workqueue_struct *queue, struct work_struct *work); /* adds the work to the given queue */
 	int queue_delayed_work(struct workqueue_struct *queue, struct work_struct *work, unsigned long delay); /* same as above, but the actual work isn't performed until at 
-																											least delay jiffies have passed. */
+                                                                                                             least delay jiffies have passed. */
 The return value of the above two functions is 0 if the work is successfully added to the queue. A nonzero value means that the work_struct is already waiting in the queue, and not added a second time.
 • At some time in the future, the work function will be called with the given data value. The work function may sleep because it is in process context (kernel threads), but it cannot access user space because it is inside a kernel thread.
 	int cancel_delayed_work(struct work_struct *work); /* The return value is nonzero if the entry was canceled before it began execution. If returns 0, then the entry may
-														have already been running on a different processor, and might still be running after a call to cancel_delayed_work()
-														*/
+                                                         have already been running on a different processor, and might still be running after a call to cancel_delayed_work()
+                                                       */
 To be absolutely sure that the work function isn't running anywhere in the system, you must follow that call with a call:
 	void flush_workqueue(struct workqueue_struct *queue); /* after it returns, no work function submitted prior to the call is running anywhere in the system. */
 

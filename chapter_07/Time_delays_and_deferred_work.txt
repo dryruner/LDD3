@@ -53,4 +53,118 @@ ii) Short delays:
 	void ndelay(unsigned long nsecs);
 	void udelay(unsigned long usecs);
 	void mdelay(unsigned long msecs);
+Note that: to avoid integer overflows, udelay() and ndelay() impose an upper bound in the value passed to them. If the module fails to load and displays an unresolved symbol, __bad_udelay, it means you call udelay with an too large argument. It's important to remember that these three delay functions are busy waiting.
 
+• Another way of achieving millisecond (and longer) delays that doesn't involve busy waiting:
+	void msleep(unsigned int millisecs);
+	unsigned long msleep_interruptible(unsigned int millisecs);
+	void ssleep(unsigned int seconds);
+The first two puts the calling process to sleep for the given number of milliseconds. The return value of msleep_interruptible() is the number of milliseconds remaining (since early wake up.) ssleep() puts the process into an uninterruptible sleep for the given number of seconds.
+• In general, if you can tolerate longer delays than requested, you should use schedule_timeout(), msleep(), or ssleep().
+
+
+3. Kernel timers:
+Whenever you need to schedule an action to happen later, without blocking the current process until that time arrives, kernel timers are the tool for you.
+* A kernel timer is a data structure that instructs the kernel to execute a user-defined function with a user-defined argument at a user-defined time. Details are in <linux/timer.h> and kernel/timer.c. When a timer runs, the process that scheduled it could be asleep, executing on a different processor, or quite possibly has exited. This behavior resembles hardware interrupt; in fact, kernel timers are run as the result of a "software interrupt". So kernel timer functions must be atomic, and there're some additional issues. When you are outside of process context (i.e. in interrupt context), you must observe the following rules:
+• No access to user space is allowed, because there's no process context.
+• The current pointer is not meaningful and cannot be used in interrupt context.
+• No sleeping or scheduling may be performed. Atomic code may not call schedule() or any form of wait_event(), nor may it call any other function that could sleep, like calling kmalloc(..., GFP_KERNEL), using semaphores, etc.
+• Kernel code can tell if it is running in interrupt context by calling: in_interrupt(), which returns nonzero if the processor is currently running in interrupt context, either hardware interrupt or software interrupt.
+in_atomic() returns nonzero whenever scheduling is not allowed, this includes hardware and software interrupt contexts as well as any time a spinlock is held. In the latter case, current may be valid, but access to user-space is forbidden, since it can cause scheduling to happen.
+
+* One other important feature of kernel timers is that a task can reregister itself to run again at a later time. Although rescheduling the same task over and over might appear to be pointless, but it is sometimes useful. For example, it can be used to implement the polling of devices.
+* It's also worth knowing that in an SMP system, the timer function is executed by the same CPU that registered it, to achieve better cache locality whenever possible. 
+* Kernel timer is also a potential source of race conditions, even on uniprocessor systems. So any data structures accessed by the timer function should be protected from concurrent access, either by being atomic types or using spinlocks. (Note that don't use semaphores, because semaphore can sleep, but kernel timer functions is a kind of software interrupt handler, so should be in atomic context.)
+
+• The kernel timer API:
+	struct timer_list {
+		/* ... */
+		unsigned long expires;  /* in jiffies */
+		void (*function)(unsigned long);
+		unsigned long data;
+	};
+	void init_timer(struct timer_list *timer);
+	struct timer_list TIMER_INITIALIZER(_function, _expires, _data);
+	void add_timer(struct timer_list *timer);  /* activates the timer to run on the current CPU */
+	int del_timer(struct timer_list *timer);
+	int mod_timer(struct time_list *timer, unsigned long expires);  /* Changes the expiration time of an already scheduled (active) timer structure; if the timer is inactive
+																	 if will be activated. */
+	int del_timer_sync(struct time_list *timer);  /* it guarantees that when it returns, the timer function is not running on any CPU. It is used to avoid race conditions on
+												   SMP machines, and the same as del_timer() on UP machines. Note that this function can sleep if it is called from a 
+												   nonatomic context, but busy waits in other situations. If the timer function reregister itself, the caller must first 
+												   ensure that this reregistration will not happen; this is usually accomplished by setting a "shutting down" flag, which is 
+												   checked by the timer function. */
+	int timer_pending(const struct timer_list *timer); /* Return a boolean whether the timer is already registered (scheduled) to run */
+• Implementation of kernel timers:
+i)   Kernel timer is based on a per-CPU data structure. struct timer_list includes a pointer to that data structure in its base field. If base is NULL, then the timer is not scheduled to run; otherwise, the pointer tells which data structure (and which CPU) runs it.
+ii)  Whenever kernel code registers a timer (add_timer or mod_timer), the operation is eventually performed by internal_add_timer, which adds the new timer to a doubly-linked list of timers within a "cascading table" associated to the current CPU.
+iii) Cascading table works like this: if the timer expires in the next 0 ~ 255 jiffies, it's added to one of the 256 lists devoted to short-range timers using the LSB of expires field. If it expires farther in the future, but before 16384 jiffies, it's added to one of 64 jiffies based on 9 ~ 14 bit of the jiffies field. For timers expiring even farther, the same trick is used for bits 15 ~ 20, 21 ~ 26, 27 ~ 31. Timers with expires in the past are scheduled to run at the next timer tick.
+iv)  If jiffies is currently a multiple of 256, the function also rehashes one of the next level lists of timers into the 256 short-term lists, possibly cascading one or more of the other levels as well, according to the bit representation of jiffies.
+• Also note that a kernel timer is far from perfect, it suffers from jitter and other artifacts induced by hardware interrupts. You may also need to resort to a real-time kernel extention.
+
+
+4. Tasklets:
+A tasklet, just like a kernel timer, is executed (in atomic mode) in the context of a "software interrupt", a kernel mechanism that executes asynchronous tasks with hardware interrupts enabled. Tasklets resemble kernel timers in some ways. They always run on the same CPU that schedules them, and they receive an unsigned long argument. Unlike kernel timers, however, you cannot execute the function at a specific time, the function at a later time chosen by the kernel.
+	#include <linux/interruot.h>
+	struct tasklet_struct {
+		/* ... */
+		void (*func)(unsigned long);
+		unsigned long data;
+	};
+	void tasklet_init(struct tasklet_struct *t, void (*func)(unsigned long), unsigned long);
+	DECLARE_TASKLET(name, func, data);
+	DECLARE_TASKLET_DISABLED(name, func, data);
+• A tasklet can be disabled and re-enabled later, it won't be executed until it is enabled as many times as it has been disabled.
+• Like kernel timers, a tasklet can re-register itself.
+• A tasklet can be scheduled to execute at normal priority or high priority.
+• Tasklets may be run immediately if the system is not under heavy load, but never later than the next timer tick.
+• The same tasklet never runs simultaneously on more than one processor, but a tasklet can be concurrent with other tasklets.
+• A tasklet always runs on the same CPU that schedules it.
+
+The kernel provides a set of ksoftirq kernel threads, one per CPU, to run "software interrupt" handlers.
+	void tasklet_disable(struct tasklet_struct *t); /* The tasklet may still be scheduled with tasklet_schedule(), but its execution is deferred until it is enabled again.
+													 After calling tasklet_disable(), you can be sure that the tasklet isn't running anywhere in the system. */
+	void tasklet_disable_nosync(struct tasklet_struct *t); /* same as above, but don't wait for any current-running function to exit. */
+	void tasklet_enable(struct tasklet_struct *t); /* must be balanced with time of disable */
+	void tasklet_schedule(struct tasklet_struct *t); /* Schedule a tasklet for execution. If it is scheduled again before it has a chance to run, it runs only once. However,
+													  if it is scheduled while it runs, it runs again after it completes. This ensures allows a tasklet to reschedule itself
+													  */
+	void tasklet_hi_schedule(struct tasklet_struct *t); /* same as above, but schedule the tasklet with higher priority */
+	void tasklet_kill(struct tasklet_struct *t); /* This ensures that the tasklet is not scheduled to run again, always called when a device is being closed or the module 
+												  removed. If the tasklet is already scheduled to run, the function waits until it completes. If the tasklet reschedules
+												  itself, you must prevent it from rescheduling itself before calling tasklet_kill(), as with del_timer_sync(). */
+• Tasklets are simply linked in a linked list, because tasklets have none of the sorting requirements of kernel timers.
+
+
+5. Workqueues:
+Workqueues, similar to tasklets, allow kernel code to request a function to be called at some time later. But:
+• Tasklets run in software interrupt context with the result that all tasklets code must be atomic. However, workqueue functions run in the context of a special kernel process, so workqueue functions can sleep.
+• Tasklets always run on the same processor from which they are scheduled. So as workqueues.
+• Kernel code can request the execution of workqueue functions be delayed for an explicit interval.
+(Tasklets execute quickly, for a short period of time, and in atomic mode; while workqueue functions may have higher latency but need not to be atomic.)
+
+A workqueue (a set of work threads) must be created before use:
+	struct workqueue_struct *create_workqueue(const char *name);
+	struct workqueue_struct *create_singlethread_workqueue(const char *name);
+Each workqueue has one or more processes (kernel threads), which run functions submitted to the queue. create_workqueue() will create one kernel thread for each processor; if a single worker thread suffice, using create_singlethread_workqueue.
+	DECLARE_WORK(name, void (*function)(void *), void *data); /* define a work */
+	INIT_WORK(struct work_struct *work, void (*function)(void *), void *data);  /* initializing the work_struct structure */
+	PREPARE_WORK(struct work_struct *work, void (*function)(void *), void *data);  /* does the same job, but it doesn't initialize the pointers used to link the work_struct 
+																					  structure into the workqueue */
+	int queue_work(struct workqueue_struct *queue, struct work_struct *work); /* adds the work to the given queue */
+	int queue_delayed_work(struct workqueue_struct *queue, struct work_struct *work, unsigned long delay); /* same as above, but the actual work isn't performed until at 
+																											least delay jiffies have passed. */
+The return value of the above two functions is 0 if the work is successfully added to the queue. A nonzero value means that the work_struct is already waiting in the queue, and not added a second time.
+• At some time in the future, the work function will be called with the given data value. The work function may sleep because it is in process context (kernel threads), but it cannot access user space because it is inside a kernel thread.
+	int cancel_delayed_work(struct work_struct *work); /* The return value is nonzero if the entry was canceled before it began execution. If returns 0, then the entry may
+														have already been running on a different processor, and might still be running after a call to cancel_delayed_work()
+														*/
+To be absolutely sure that the work function isn't running anywhere in the system, you must follow that call with a call:
+	void flush_workqueue(struct workqueue_struct *queue); /* after it returns, no work function submitted prior to the call is running anywhere in the system. */
+
+• The shared queue:
+Device driver, in many cases, doesn't need its own workqueue. The kernel provides the default events workqueue.
+	schedule_work(struct work_struct *work);  /* equivalent to queue_work() */
+	schdeule_dalayed_work(struct work_struct *work, unsigned long delay);  /* equivalent to queue_delayed_work() */
+	flush_scheduled_work(void);  /* equivalent to flush_workqueue() */
+If you want to cancel a work entry submitted to the shared queue, you can still use cancel_delayed_work().

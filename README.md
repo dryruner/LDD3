@@ -5,3 +5,4 @@
 * Chapter 5: Concurrency and Race Conditions
 * Chapter 6: Advanced Char Driver Operations
 * Chapter 7: Time, Delays, and Deferred Work
+* Chapter 8: Allocating Memory

@@ -127,8 +127,7 @@ The kernel provides a set of ksoftirq kernel threads, one per CPU, to run "softw
 	void tasklet_disable_nosync(struct tasklet_struct *t); /* same as above, but don't wait for any current-running function to exit. */
 	void tasklet_enable(struct tasklet_struct *t); /* must be balanced with time of disable */
 	void tasklet_schedule(struct tasklet_struct *t); /* Schedule a tasklet for execution. If it is scheduled again before it has a chance to run, it runs only once. However,
-                                                        if it is scheduled while it runs, it runs again after it completes. This ensures allows a tasklet to reschedule itself
-                                                     */
+                                                        if it is scheduled while it runs, it runs again after it completes. This allows a tasklet to reschedule itself. */
 	void tasklet_hi_schedule(struct tasklet_struct *t); /* same as above, but schedule the tasklet with higher priority */
 	void tasklet_kill(struct tasklet_struct *t); /* This ensures that the tasklet is not scheduled to run again, always called when a device is being closed or the module 
                                                   removed. If the tasklet is already scheduled to run, the function waits until it completes. If the tasklet reschedules

@@ -1,0 +1,157 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+DEBFLAGS	Makefile	/^  DEBFLAGS = -O -g -DSCULL_DEBUG # "-O" is needed to expand inlines$/;"	m
+DEBFLAGS	Makefile	/^  DEBFLAGS = -O2$/;"	m
+KERNELDIR	Makefile	/^KERNELDIR ?= \/lib\/modules\/$(shell uname -r)\/build$/;"	m
+LIMIT	pipe.c	285;"	d	file:
+NUM	scull.h	101;"	d
+PDEBUG	scull.h	27;"	d
+PDEBUG	scull.h	31;"	d
+PDEBUG	scull.h	34;"	d
+PDEBUG	scull.h	37;"	d
+PDEBUGG	scull.h	40;"	d
+PDEBUGG	scull.h	41;"	d
+PWD	Makefile	/^PWD       := $(shell pwd)$/;"	m
+SCULL_IOCGQSET	scull.h	158;"	d
+SCULL_IOCGQUANTUM	scull.h	157;"	d
+SCULL_IOCHQSET	scull.h	164;"	d
+SCULL_IOCHQUANTUM	scull.h	163;"	d
+SCULL_IOCQQSET	scull.h	160;"	d
+SCULL_IOCQQUANTUM	scull.h	159;"	d
+SCULL_IOCRESET	scull.h	143;"	d
+SCULL_IOCSQSET	scull.h	154;"	d
+SCULL_IOCSQUANTUM	scull.h	153;"	d
+SCULL_IOCTQSET	scull.h	156;"	d
+SCULL_IOCTQUANTUM	scull.h	155;"	d
+SCULL_IOCXQSET	scull.h	162;"	d
+SCULL_IOCXQUANTUM	scull.h	161;"	d
+SCULL_IOC_MAGIC	scull.h	140;"	d
+SCULL_IOC_MAXNR	scull.h	175;"	d
+SCULL_MAJOR	scull.h	44;"	d
+SCULL_NR_DEVS	scull.h	48;"	d
+SCULL_N_ADEVS	access.c	337;"	d	file:
+SCULL_P_BUFFER	scull.h	76;"	d
+SCULL_P_IOCQSIZE	scull.h	172;"	d
+SCULL_P_IOCTSIZE	scull.h	171;"	d
+SCULL_P_NR_DEVS	scull.h	52;"	d
+SCULL_QSET	scull.h	69;"	d
+SCULL_QUANTUM	scull.h	65;"	d
+TYPE	scull.h	100;"	d
+_SCULL_H_	scull.h	19;"	d
+access_key	scull.h	/^	unsigned int access_key;  \/* used by sculluid and scullpriv *\/$/;"	m	struct:scull_dev
+async_queue	pipe.c	/^        struct fasync_struct *async_queue; \/* asynchronous readers *\/$/;"	m	struct:scull_pipe	typeref:struct:scull_pipe::fasync_struct	file:
+buffer	pipe.c	/^        char *buffer, *end;                \/* begin of buf, end of buf *\/$/;"	m	struct:scull_pipe	file:
+buffersize	pipe.c	/^        int buffersize;                    \/* used in pointer arithmetic *\/$/;"	m	struct:scull_pipe	file:
+cdev	pipe.c	/^        struct cdev cdev;                  \/* Char device structure *\/$/;"	m	struct:scull_pipe	typeref:struct:scull_pipe::cdev	file:
+cdev	scull.h	/^	struct cdev cdev;	  \/* Char device structure		*\/$/;"	m	struct:scull_dev	typeref:struct:scull_dev::cdev
+data	scull.h	/^	struct scull_qset *data;  \/* Pointer to first quantum set *\/$/;"	m	struct:scull_dev	typeref:struct:scull_dev::scull_qset
+data	scull.h	/^	void **data;$/;"	m	struct:scull_qset
+device	access.c	/^	struct scull_dev device;$/;"	m	struct:scull_listitem	typeref:struct:scull_listitem::scull_dev	file:
+end	pipe.c	/^        char *buffer, *end;                \/* begin of buf, end of buf *\/$/;"	m	struct:scull_pipe	file:
+fops	access.c	/^	struct file_operations *fops;$/;"	m	struct:scull_adev_info	typeref:struct:scull_adev_info::file_operations	file:
+inq	pipe.c	/^        wait_queue_head_t inq, outq;       \/* read and write queues *\/$/;"	m	struct:scull_pipe	file:
+key	access.c	/^	dev_t key;$/;"	m	struct:scull_listitem	file:
+list	access.c	/^	struct list_head list;$/;"	m	struct:scull_listitem	typeref:struct:scull_listitem::list_head	file:
+name	access.c	/^	char *name;$/;"	m	struct:scull_adev_info	file:
+next	scull.h	/^	struct scull_qset *next;$/;"	m	struct:scull_qset	typeref:struct:scull_qset::scull_qset
+nreaders	pipe.c	/^        int nreaders, nwriters;            \/* number of openings for r\/w *\/$/;"	m	struct:scull_pipe	file:
+nwriters	pipe.c	/^        int nreaders, nwriters;            \/* number of openings for r\/w *\/$/;"	m	struct:scull_pipe	file:
+obj-m	Makefile	/^obj-m	:= scull.o$/;"	m
+outq	pipe.c	/^        wait_queue_head_t inq, outq;       \/* read and write queues *\/$/;"	m	struct:scull_pipe	file:
+qset	scull.h	/^	int qset;                 \/* the current array size *\/$/;"	m	struct:scull_dev
+quantum	scull.h	/^	int quantum;              \/* the current quantum size *\/$/;"	m	struct:scull_dev
+rp	pipe.c	/^        char *rp, *wp;                     \/* where to read, where to write *\/$/;"	m	struct:scull_pipe	file:
+scull-objs	Makefile	/^scull-objs := main.o pipe.o access.o$/;"	m
+scull_a_firstdev	access.c	/^static dev_t scull_a_firstdev;  \/* Where our range begins *\/$/;"	v	file:
+scull_access_cleanup	access.c	/^void scull_access_cleanup(void)$/;"	f
+scull_access_devs	access.c	/^} scull_access_devs[] = {$/;"	v	typeref:struct:scull_adev_info	file:
+scull_access_init	access.c	/^int scull_access_init(dev_t firstdev)$/;"	f
+scull_access_setup	access.c	/^static void scull_access_setup (dev_t devno, struct scull_adev_info *devinfo)$/;"	f	file:
+scull_adev_info	access.c	/^static struct scull_adev_info {$/;"	s	file:
+scull_c_device	access.c	/^static struct scull_dev scull_c_device;   $/;"	v	typeref:struct:scull_dev	file:
+scull_c_lock	access.c	/^static spinlock_t scull_c_lock = SPIN_LOCK_UNLOCKED;$/;"	v	file:
+scull_c_lookfor_device	access.c	/^static struct scull_dev *scull_c_lookfor_device(dev_t key)$/;"	f	file:
+scull_c_open	access.c	/^static int scull_c_open(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_c_release	access.c	/^static int scull_c_release(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_cleanup_module	main.c	/^module_exit(scull_cleanup_module);$/;"	v
+scull_cleanup_module	main.c	/^void scull_cleanup_module(void)$/;"	f
+scull_create_proc	main.c	/^static void scull_create_proc(void)$/;"	f	file:
+scull_dev	scull.h	/^struct scull_dev {$/;"	s
+scull_devices	main.c	/^struct scull_dev *scull_devices;	\/* allocated in scull_init_module *\/$/;"	v	typeref:struct:scull_dev
+scull_follow	main.c	/^struct scull_qset *scull_follow(struct scull_dev *dev, int n)$/;"	f
+scull_fops	main.c	/^struct file_operations scull_fops = {$/;"	v	typeref:struct:file_operations
+scull_getwritespace	pipe.c	/^static int scull_getwritespace(struct scull_pipe *dev, struct file *filp)$/;"	f	file:
+scull_init_module	main.c	/^int scull_init_module(void)$/;"	f
+scull_init_module	main.c	/^module_init(scull_init_module);$/;"	v
+scull_ioctl	main.c	/^int scull_ioctl(struct inode *inode, struct file *filp,$/;"	f
+scull_listitem	access.c	/^struct scull_listitem {$/;"	s	file:
+scull_llseek	main.c	/^loff_t scull_llseek(struct file *filp, loff_t off, int whence)$/;"	f
+scull_major	main.c	/^int scull_major =   SCULL_MAJOR;$/;"	v
+scull_minor	main.c	/^int scull_minor =   0;$/;"	v
+scull_nr_devs	main.c	/^int scull_nr_devs = SCULL_NR_DEVS;	\/* number of bare scull devices *\/$/;"	v
+scull_open	main.c	/^int scull_open(struct inode *inode, struct file *filp)$/;"	f
+scull_p_buffer	pipe.c	/^int scull_p_buffer =  SCULL_P_BUFFER;	\/* buffer size *\/$/;"	v
+scull_p_cleanup	pipe.c	/^void scull_p_cleanup(void)$/;"	f
+scull_p_devices	pipe.c	/^static struct scull_pipe *scull_p_devices;$/;"	v	typeref:struct:scull_pipe	file:
+scull_p_devno	pipe.c	/^dev_t scull_p_devno;			\/* Our first device number *\/$/;"	v
+scull_p_fasync	pipe.c	/^static int scull_p_fasync(int fd, struct file *filp, int mode)$/;"	f	file:
+scull_p_init	pipe.c	/^int scull_p_init(dev_t firstdev)$/;"	f
+scull_p_nr_devs	pipe.c	/^static int scull_p_nr_devs = SCULL_P_NR_DEVS;	\/* number of pipe devices *\/$/;"	v	file:
+scull_p_open	pipe.c	/^static int scull_p_open(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_p_poll	pipe.c	/^static unsigned int scull_p_poll(struct file *filp, poll_table *wait)$/;"	f	file:
+scull_p_read	pipe.c	/^static ssize_t scull_p_read (struct file *filp, char __user *buf, size_t count,$/;"	f	file:
+scull_p_release	pipe.c	/^static int scull_p_release(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_p_setup_cdev	pipe.c	/^static void scull_p_setup_cdev(struct scull_pipe *dev, int index)$/;"	f	file:
+scull_p_write	pipe.c	/^static ssize_t scull_p_write(struct file *filp, const char __user *buf, size_t count,$/;"	f	file:
+scull_pipe	pipe.c	/^struct scull_pipe {$/;"	s	file:
+scull_pipe_fops	pipe.c	/^struct file_operations scull_pipe_fops = {$/;"	v	typeref:struct:file_operations
+scull_priv_fops	access.c	/^struct file_operations scull_priv_fops = {$/;"	v	typeref:struct:file_operations
+scull_proc_open	main.c	/^static int scull_proc_open(struct inode *inode, struct file *file)$/;"	f	file:
+scull_proc_ops	main.c	/^static struct file_operations scull_proc_ops = {$/;"	v	typeref:struct:file_operations	file:
+scull_qset	main.c	/^int scull_qset =    SCULL_QSET;$/;"	v
+scull_qset	scull.h	/^struct scull_qset {$/;"	s
+scull_quantum	main.c	/^int scull_quantum = SCULL_QUANTUM;$/;"	v
+scull_read	main.c	/^ssize_t scull_read(struct file *filp, char __user *buf, size_t count,$/;"	f
+scull_read_p_mem	pipe.c	/^static int scull_read_p_mem(char *buf, char **start, off_t offset, int count,$/;"	f	file:
+scull_read_procmem	main.c	/^int scull_read_procmem(char *buf, char **start, off_t offset,$/;"	f
+scull_release	main.c	/^int scull_release(struct inode *inode, struct file *filp)$/;"	f
+scull_remove_proc	main.c	/^static void scull_remove_proc(void)$/;"	f	file:
+scull_s_available	access.c	/^static atomic_t scull_s_available = ATOMIC_INIT(1);$/;"	v	file:
+scull_s_device	access.c	/^static struct scull_dev scull_s_device;$/;"	v	typeref:struct:scull_dev	file:
+scull_s_open	access.c	/^static int scull_s_open(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_s_release	access.c	/^static int scull_s_release(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_seq_next	main.c	/^static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)$/;"	f	file:
+scull_seq_ops	main.c	/^static struct seq_operations scull_seq_ops = {$/;"	v	typeref:struct:seq_operations	file:
+scull_seq_show	main.c	/^static int scull_seq_show(struct seq_file *s, void *v)$/;"	f	file:
+scull_seq_start	main.c	/^static void *scull_seq_start(struct seq_file *s, loff_t *pos)$/;"	f	file:
+scull_seq_stop	main.c	/^static void scull_seq_stop(struct seq_file *s, void *v)$/;"	f	file:
+scull_setup_cdev	main.c	/^static void scull_setup_cdev(struct scull_dev *dev, int index)$/;"	f	file:
+scull_sngl_fops	access.c	/^struct file_operations scull_sngl_fops = {$/;"	v	typeref:struct:file_operations
+scull_trim	main.c	/^int scull_trim(struct scull_dev *dev)$/;"	f
+scull_u_count	access.c	/^static int scull_u_count;	\/* initialized to 0 by default *\/$/;"	v	file:
+scull_u_device	access.c	/^static struct scull_dev scull_u_device;$/;"	v	typeref:struct:scull_dev	file:
+scull_u_lock	access.c	/^static spinlock_t scull_u_lock = SPIN_LOCK_UNLOCKED;$/;"	v	file:
+scull_u_open	access.c	/^static int scull_u_open(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_u_owner	access.c	/^static uid_t scull_u_owner;	\/* initialized to 0 by default *\/$/;"	v	file:
+scull_u_release	access.c	/^static int scull_u_release(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_user_fops	access.c	/^struct file_operations scull_user_fops = {$/;"	v	typeref:struct:file_operations
+scull_w_available	access.c	/^static inline int scull_w_available(void)$/;"	f	file:
+scull_w_count	access.c	/^static int scull_w_count;	\/* initialized to 0 by default *\/$/;"	v	file:
+scull_w_device	access.c	/^static struct scull_dev scull_w_device;$/;"	v	typeref:struct:scull_dev	file:
+scull_w_lock	access.c	/^static spinlock_t scull_w_lock = SPIN_LOCK_UNLOCKED;$/;"	v	file:
+scull_w_open	access.c	/^static int scull_w_open(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_w_owner	access.c	/^static uid_t scull_w_owner;	\/* initialized to 0 by default *\/$/;"	v	file:
+scull_w_release	access.c	/^static int scull_w_release(struct inode *inode, struct file *filp)$/;"	f	file:
+scull_write	main.c	/^ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,$/;"	f
+scull_wusr_fops	access.c	/^struct file_operations scull_wusr_fops = {$/;"	v	typeref:struct:file_operations
+sculldev	access.c	/^	struct scull_dev *sculldev;$/;"	m	struct:scull_adev_info	typeref:struct:scull_adev_info::scull_dev	file:
+scullp_proc_offset	pipe.c	/^static void scullp_proc_offset(char *buf, char **start, off_t *offset, int *len)$/;"	f	file:
+sem	pipe.c	/^        struct semaphore sem;              \/* mutual exclusion semaphore *\/$/;"	m	struct:scull_pipe	typeref:struct:scull_pipe::semaphore	file:
+sem	scull.h	/^	struct semaphore sem;     \/* mutual exclusion semaphore     *\/$/;"	m	struct:scull_dev	typeref:struct:scull_dev::semaphore
+size	scull.h	/^	unsigned long size;       \/* amount of data stored here *\/$/;"	m	struct:scull_dev
+spacefree	pipe.c	/^static int spacefree(struct scull_pipe *dev)$/;"	f	file:
+wp	pipe.c	/^        char *rp, *wp;                     \/* where to read, where to write *\/$/;"	m	struct:scull_pipe	file:

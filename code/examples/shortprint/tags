@@ -1,0 +1,66 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+KERNELDIR	Makefile	/^KERNELDIR ?= \/lib\/modules\/$(shell uname -r)\/build$/;"	m
+PWD	Makefile	/^PWD       := $(shell pwd)$/;"	m
+SHORTP_NR_PORTS	shortprint.c	40;"	d	file:
+SP_CONTROL	shortprint.h	22;"	d
+SP_CR_AUTOLF	shortprint.h	40;"	d
+SP_CR_INIT	shortprint.h	39;"	d
+SP_CR_IRQ	shortprint.h	37;"	d
+SP_CR_SELECT	shortprint.h	38;"	d
+SP_CR_STROBE	shortprint.h	41;"	d
+SP_DATA	shortprint.h	20;"	d
+SP_MIN_SPACE	shortprint.h	46;"	d
+SP_NPORTS	shortprint.h	23;"	d
+SP_SR_ACK	shortprint.h	29;"	d
+SP_SR_BUSY	shortprint.h	28;"	d
+SP_SR_ERR	shortprint.h	32;"	d
+SP_SR_ONLINE	shortprint.h	31;"	d
+SP_SR_PAPER	shortprint.h	30;"	d
+SP_STATUS	shortprint.h	21;"	d
+TIMEOUT	shortprint.c	150;"	d	file:
+base	shortprint.c	/^static unsigned long base = 0x378;$/;"	v	file:
+delay	shortprint.c	/^static int delay = 0;$/;"	v	file:
+irq	shortprint.c	/^static int irq = -1;$/;"	v	file:
+major	shortprint.c	/^static int major = 0; \/* dynamic by default *\/$/;"	v	file:
+obj-m	Makefile	/^obj-m	:= shortprint.o$/;"	m
+shortp_base	shortprint.c	/^unsigned long shortp_base = 0;$/;"	v
+shortp_cleanup	shortprint.c	/^module_exit(shortp_cleanup);$/;"	v
+shortp_cleanup	shortprint.c	/^static void shortp_cleanup(void)$/;"	f	file:
+shortp_delay	shortprint.c	/^static int shortp_delay;$/;"	v	file:
+shortp_do_work	shortprint.c	/^static void shortp_do_work(void *unused)$/;"	f	file:
+shortp_do_write	shortprint.c	/^static void shortp_do_write(void)$/;"	f	file:
+shortp_empty_queue	shortprint.c	/^DECLARE_WAIT_QUEUE_HEAD(shortp_empty_queue); \/* waked when queue empties *\/$/;"	v
+shortp_fops	shortprint.c	/^static struct file_operations shortp_fops = {$/;"	v	typeref:struct:file_operations	file:
+shortp_in_buffer	shortprint.c	/^static unsigned long shortp_in_buffer = 0;$/;"	v	file:
+shortp_in_head	shortprint.c	/^static unsigned long volatile shortp_in_head;$/;"	v	file:
+shortp_in_queue	shortprint.c	/^DECLARE_WAIT_QUEUE_HEAD(shortp_in_queue);$/;"	v
+shortp_in_tail	shortprint.c	/^static volatile unsigned long shortp_in_tail;$/;"	v	file:
+shortp_incr_bp	shortprint.c	/^static inline void shortp_incr_bp(volatile unsigned long *index, int delta)$/;"	f	file:
+shortp_incr_out_bp	shortprint.c	/^static inline void shortp_incr_out_bp(volatile unsigned char **bp, int incr)$/;"	f	file:
+shortp_init	shortprint.c	/^module_init(shortp_init);$/;"	v
+shortp_init	shortprint.c	/^static int shortp_init(void)$/;"	f	file:
+shortp_interrupt	shortprint.c	/^static irqreturn_t shortp_interrupt(int irq, void *dev_id, struct pt_regs *regs)$/;"	f	file:
+shortp_irq	shortprint.c	/^static int shortp_irq = -1;$/;"	v	file:
+shortp_open	shortprint.c	/^static int shortp_open(struct inode *inode, struct file *filp)$/;"	f	file:
+shortp_out_buffer	shortprint.c	/^static unsigned char *shortp_out_buffer = NULL;$/;"	v	file:
+shortp_out_head	shortprint.c	/^static volatile unsigned char *shortp_out_head, *shortp_out_tail;$/;"	v	file:
+shortp_out_lock	shortprint.c	/^static spinlock_t shortp_out_lock;$/;"	v	file:
+shortp_out_sem	shortprint.c	/^static struct semaphore shortp_out_sem;$/;"	v	typeref:struct:semaphore	file:
+shortp_out_space	shortprint.c	/^static inline int shortp_out_space(void)$/;"	f	file:
+shortp_out_tail	shortprint.c	/^static volatile unsigned char *shortp_out_head, *shortp_out_tail;$/;"	v	file:
+shortp_output_active	shortprint.c	/^volatile static int shortp_output_active;$/;"	v	file:
+shortp_poll	shortprint.c	/^static unsigned int shortp_poll(struct file *filp, poll_table *wait)$/;"	f	file:
+shortp_read	shortprint.c	/^static ssize_t shortp_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)$/;"	f	file:
+shortp_release	shortprint.c	/^static int shortp_release(struct inode *inode, struct file *filp)$/;"	f	file:
+shortp_start_output	shortprint.c	/^static void shortp_start_output(void)$/;"	f	file:
+shortp_timeout	shortprint.c	/^static void shortp_timeout(unsigned long unused)$/;"	f	file:
+shortp_timer	shortprint.c	/^static struct timer_list shortp_timer;$/;"	v	typeref:struct:timer_list	file:
+shortp_tv	shortprint.c	/^static struct timeval shortp_tv;  \/* When the interrupt happened. *\/$/;"	v	typeref:struct:timeval	file:
+shortp_wait	shortprint.c	/^static void shortp_wait(void)$/;"	f	file:
+shortp_workqueue	shortprint.c	/^static struct workqueue_struct *shortp_workqueue;$/;"	v	typeref:struct:workqueue_struct	file:
+shortp_write	shortprint.c	/^static ssize_t shortp_write(struct file *filp, const char __user *buf, size_t count,$/;"	f	file:

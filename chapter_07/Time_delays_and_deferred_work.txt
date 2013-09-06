@@ -24,7 +24,7 @@ Note that: i) jiffies is always sufficient for measuring time intervals; ii) if 
 * void do_gettimeofday(struct timeval *tv);
 Fill in the timeval structure with seconds and milliseconds since the Epoch, with the best resolution the hardware can offer.
 * struct timespec current_kernel_time(void);
-The current time (wall time) is also available (though with jiffy granularity) from the xtime variable - a struct timespec value.
+The current time (wall time) is also available (though with jiffy granularity) from the xtime variable - a struct timespec value. (xtime stores the number of seconds since EPOCH.)
 
 
 2. Delaying execution:

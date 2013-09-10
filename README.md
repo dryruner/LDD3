@@ -9,3 +9,4 @@
 * Chapter 09: Communicating with Hardware
 * Chapter 10: Interrupt Handling
 * Chapter 11: Data Types in the Kernel
+* Chapter 12: PCI Drivers

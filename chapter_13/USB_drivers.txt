@@ -20,9 +20,9 @@
     | ------------------------------------------  |
     | | Config                                 |  |
     | |         ----------------------------   |  |
-    | |         | Interface                |   |  |      --------------
-    | |         |           ------------   |<--|--|------| USB Driver |
-    | |         |           | Endpoint |   |   |  |      --------------
+    | |         | Interface                |   |  |       --------------
+    | |         |           ------------   |<--|--|-------| USB Driver |
+    | |         |           | Endpoint |   |   |  |       --------------
     | |         |           ------------   |   |  |
     | |         |           | Endpoint |   |   |  |
     | |         |           ------------   |   |  |
@@ -78,4 +78,70 @@ USB interfaces themselves are bundled up into configurations. Linux describes US
 
 
 2. USB and sysfs:
+• Both the physical USB device (as represented by @struct usb_device) and the individual USB interfaces (as represented by @struct usb_interface) are shown in sysfs as individual devices. (This is because both of these structures contain a @struct device structure.) See the example at LDD3 P333.
+• To summarize, the USB sysfs device naming scheme is:
+	root_hub-hub_port:config.interface
+As the devices go further down in the USB tree, and as more and more USB hubs are used, the hub port number is added to the string following the previous hub port number in the chain. For a two-deep tree, the device name looks like:
+	root_hub-hub_port-hub_port:config.interface
+• Sysfs doesn't expose all of the different parts of a USB device, as it stops at the interface level. There's usbfs filesystem, which is mounted in the /proc/bus/usb/. Search the web for more information.
+
+
+3. USB Urbs:
+• The USB code in the kernel communicates with all USB devices using something called a urb (USB request block). This request block is described with @struct urb, which is defined in <linux/usb.h>.
+• A urb is used to send or receive data to or from a specific USB endpoint on a specific USB device in an asynchronous manner. A USB device driver may allocate many urbs for a single endpoint, or may reuse a single urb for many different endpoints. 
+• Every endpoint in a device can handle a queue of urbs, so that multiple urbs can be sent to the same endpoint before the queue is empty.
+
+• The typical lifecycle of a urb is as follows: (also refer to the two diagrams above)
+i)   Created by a USB device driver.
+ii)  Assigned to a specific endpoint of a specific USB device.
+iii) Submitted to the USB core, by the USB device driver.
+iv)  Submitted to the specific USB host controller driver for the specified device by the USB core.
+v)   Processed by the USB host controller driver that makes a USB transfer to the device.
+vi)  When the urb is completed, the USB host controller driver notifies the USB device driver.
+• Urbs can also be canceled any time by the driver that submitted the urb, or by the USB core if the device is removed from the system.
+Detailed fields in the @struct urb see LDD3 P336 ~ P341 and the source code for more details.
+
+• Creating and destroying urbs:
+* Note that @struct urb structure must NEVER be created statically in a driver or within another structure, because that would break the reference counting scheme used by the USB core for urbs. It must be created with:
+	struct urb *usb_alloc_urb(int iso_packets, gfp_t mem_flags);
+	@iso_packets: the number of osochronous packets this urb should contain. If you do not want to create an isochronous urb, this variable should be set to 0.
+	@mem_flags: the same type of flag that is passed to kmalloc().
+	void usb_free_urb(struct urb *urb);
+* Interrupt urbs:
+A helper function to properly initialize a urb to be sent to an interrupt endpoint of a USB device:
+	void usb_fill_int_urb(struct urb *urb, struct usb_device *dev, unsigned int pipe, void *trandfer_buffer, int buffer_length, usb_complete_t complete, void *context, int interval);
+	@urb: A pointer to the urb to be initialized.
+	@dev: The USB device to which this urb is to be sent.
+	@pipe: The specific endpoint of the USB device to which this urb is to be sent. This value is created with the previously mentioned usb_sndintpipe() or usb_rcvintpipe() functions.
+	@transfer_buffer: A pointer to the buffer from which outgoing data is taken or into which incoming data is received. Note that this cannot be a static buffer and must be created with a call to kmalloc.
+	@buffer_length: The length of the buffer pointed to by the transfer_buffer pointer.
+	@complete: Pointer to the completion handler that is called when this urb is completed.
+	@context: Pointer to the blob that is added to the urb structure for later retrieval by the completion handler function.
+	@interval: The interval at which that this urb should be scheduled.
+* Bulk urbs:
+	void usb_fill_bulk_urb(struct urb *urb, struct usb_device *dev, unsigned int pipe, void *transfer_buffer, int buffer_length, usb_complete_t complete, void *context);
+There is no interval argument because bulk urbs have no interval value. And also note that the @pipe parameter must be initialized with a call to the usb_sndbulkpipe() or usb_rcvbulkpipe() function.
+* Control urbs:
+	void usb_fill_control_urb(struct urb *urb, struct usb_device *dev, unsigned int pipe, unsigned char *setup_packet, void *transfer_buffer, int buffer_length, usb_complete_t complete, void *context);
+@setup_packet: must point to the setup packet data that is to be sent to the endpoint.
+Also, @pipe must be initialized with a call to usb_sndctrlpipe() or usb_rcvctrlpipe().
+* Isochronous urbs:
+Isochronous urbs do not have an initialization function like the interrupt, control, and bulk urbs do. So they must be initialized by hand in the driver before they can be submitted to the USB core.
+
+• Submitting urbs:
+Once the urb has been properly created and initialized by the USB driver, it is ready to be submitted to the USB core to be sent out to the USB device:
+	int usb_submit_urb(struct urb *urb, gfp_t mem_flags);
+After a urb has been submitted to the USB core successfully, it should never try to access any fields of the urb structure until the complete function is called.
+Because the function @usb_submit_urb() can be called at any time (including from within an interrupt context), the specification of @mem_flags variable must be correct. There are only three valid values that should be used, depending on when usb_submit_urb() is called:
+i)   GFP_ATOMIC: This flag should be used if: the caller is within a urb completion handler, an interrupt, a bottom half, a tasklet, or a timer callback. Or if the caller is holding a spinlock or rwlock. Or if the current->state is not TASK_RUNNING.
+ii)  GFP_NOIO: This flag should be used if the driver is in the block I/O path, it should also be used in the error handling path of all storage-type devices.
+iii) GFP_KERNEL: This could be used for any other situations.
+
+• Completing urbs: the completion callback handler:
+If the call to usb_submit_urb() is successful, it returns 0; otherwise it returns a negative error code. Once it succeeds, the completion handler of the urb is called exactly once when the urb is completed. When this function is called, the USB core is finished with the urb, and control of it is now returned to the device driver.
+
+• Canceling urbs:
+To stop the urb that has been submitted to the USB core, the functions usb_kill_urb() or usb_unlink_urb() should be called:
+	int usb_kill_urb(struct urb *urb);
+	int usb_unlink_urb(struct urb *urb);
 

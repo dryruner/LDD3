@@ -1,0 +1,59 @@
+• The linux kernel supports two main types of USB drivers: i) drivers on a host system (USB host drivers); ii) drivers on a device (USB gadget drivers). This chapter we'll discuss about USB host drivers.
+
+1. USB device basics:
+• USB driver overview:
+    ----------------------------------------------------------------------
+    | VFS layer | Block layer | Net layer | Char layer | TTY layer | ... |
+    ----------------------------------------------------------------------
+    |                        USB Device Drivers                          |
+	----------------------------------------------------------------------
+    |                             USB Core                               |
+    ----------------------------------------------------------------------
+    |                        USB Host Controllers                        |
+    ----------------------------------------------------------------------
+                                       ^
+                                   Hardware
+
+• USB device overview:
+    -----------------------------------------------
+    | Device                                      |
+    | ------------------------------------------  |
+    | | Config                                 |  |
+    | |         ----------------------------   |  |
+    | |         | Interface                |   |  |      --------------
+    | |         |           ------------   |<--|--|------| USB Driver |
+    | |         |           | Endpoint |   |   |  |      --------------
+    | |         |           ------------   |   |  |
+    | |         |           | Endpoint |   |   |  |
+    | |         |           ------------   |   |  |
+    | |         |           | Endpoint |   |   |  |
+    | |         |           ------------   |   |  |
+    | |         ----------------------------   |  |
+    | |                                        |  |
+    | |         ----------------------------   |  |
+    | |         | Interface                |   |  |       --------------
+    | |         |           ------------   |<--|--|-------| USB Driver |
+    | |         |           | Endpoint |   |   |  |       --------------
+    | |         |           ------------   |   |  |
+    | |         |           | Endpoint |   |   |  |
+    | |         |           ------------   |   |  |
+    | |         |           | Endpoint |   |   |  |
+    | |         |           ------------   |   |  |
+    | |         ----------------------------   |  |
+    | |                                        |  |
+    | ------------------------------------------  |
+    |                                             |
+    -----------------------------------------------
+
+* Endpoints:
+A USB endpoint can carry data in only one direction, eigher from the host PC to device (OUT endpoint) or from the device to host PC (IN endpoint). A USB endpoint can be one of the four types:
+i)   CONTROL:
+Every USB device has a control endpoint called "endpoint 0" that is used by the USB core to configure the device at insertion time. These transfers are guaranteed by the USB protocol to always have enough reserved bandwidth to make it through to the device.
+ii)  INTERRUPT:
+Interrupt endpoints transfer small amounts of data at a fixed rate every time the USB host asks the device for data. They are also commonly used to send data to USB devices to control the device, but are not generally used to transfer large amounts of data. These transfers are guaranteed by the USB protocol to always have enough reserved bandwidth to make it through.
+iii) BULK:
+Bulk endpoints transfer large amounts of data. They are common for devices that need to transfer any data that must get through with no data loss. These transfers are NOT guaranteed by the USB protocol to always make it through in a specific amount of time. If there is not enough room on the bus to send the whole BULK packet, it is split up across multiple transfers to or from the device. (These endpoints are common on printers, storage, and network devices.)
+iv)  ISOCHRONOUS:
+Isochronous endpoints also transfer large amounts of data, but the data is NOT always guaranteed to make it through. These endpoints are used in device that can handle loss of data, and rely more on keeping a constant stream of data flowing. Real-time collections, such as audio and video devices, almost always use these endpoints.
+
+

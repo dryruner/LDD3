@@ -6,7 +6,7 @@
     | VFS layer | Block layer | Net layer | Char layer | TTY layer | ... |
     ----------------------------------------------------------------------
     |                        USB Device Drivers                          |
-	----------------------------------------------------------------------
+    ----------------------------------------------------------------------
     |                             USB Core                               |
     ----------------------------------------------------------------------
     |                        USB Host Controllers                        |
@@ -55,5 +55,27 @@ iii) BULK:
 Bulk endpoints transfer large amounts of data. They are common for devices that need to transfer any data that must get through with no data loss. These transfers are NOT guaranteed by the USB protocol to always make it through in a specific amount of time. If there is not enough room on the bus to send the whole BULK packet, it is split up across multiple transfers to or from the device. (These endpoints are common on printers, storage, and network devices.)
 iv)  ISOCHRONOUS:
 Isochronous endpoints also transfer large amounts of data, but the data is NOT always guaranteed to make it through. These endpoints are used in device that can handle loss of data, and rely more on keeping a constant stream of data flowing. Real-time collections, such as audio and video devices, almost always use these endpoints.
+• Control and bulk endpoints are used for asynchronous data transfers, whenever the driver decides to use them. Interrupt and isochronous endpoints are periodic. This means that these endpoints are set up to transfer data at fixed times continuously, which causes their bandwidth to be reserved by the USB core.
+• USB endpoints are described in the kernel with the structure @usb_host_endpoint, which contains the real endpoint information in another struture called @usb_endpoint_descriptor. The fields in @usb_endpoint_descriptor that drivers care about are:
+	bEndpointAddress: 8-bit value, which could be masked using USB_DIR_OUT and USB_DIR_IN to determine if the data for this endpoint is directed to the device or the host.
+	bmAttributes: the type of this endpoint, which could be masked using USB_ENDPOINT_XFERTYPE_MASK to determine if the endpoint is of type USB_ENDPOINT_XFER_ISOC, USB_ENDPOINT_XFER_BULK, or USB_ENDPOINT_XFER_INT.
+	wMaxPacketSize: The maximum size in bytes that this endpoint can handle at once.
+	bInterval: If this endpoint of type interrupt, this value is the interval setting for the endpoint - the time between interrupt requests for the endpoint.
 
+* Interfaces:
+USB endpoints are bundled up into interfaces. USB interfaces handle only one type of a USB logical connection, such as a mouse, a keyboard, etc. Because a USB interface represents basic functionality, each USB driver controls an interface. USB interfaces are described in the kernel with @usb_interface, some of the important fields in it are:
+	@struct usb_host_interface *altsetting: An array of interface structures containing all of the alternate settings that may be selected for this interface. Each struct usb_host_interface consists of a set of endpoint configurations as defined by the struct usb_host_endpoint.
+	@unsigned num_altsetting: number of alternate settings pointed to by the altsetting pointer.
+	@struct usb_host_interface *cur_altsetting: A pointer into the array altsetting, denoting the currently active setting for this interface.
+	@int minor: If the USB driver bound to this interface uses the USB major number, this variable contains the minor number assigned by the USB core to the interface. This is valid only only after a successful call to usb_register_dev().
+
+* Configurations:
+USB interfaces themselves are bundled up into configurations. Linux describes USB configurations with @struct usb_host_config, describes the entire USB devices with @struct usb_device. 
+• The USB driver commonly has to convert data from a given @struct usb_interface into @struct usb_device that the USB core needs for a wide range of function calls:
+	struct usb_device *interface_to_usbdev(struct usb_interface *intf);
+
+* Devices usually have one or more configurations; Configurations often have one or more interfaces; Interfaces usually have one or more settings, interfaces often have zero or more endpoints.
+
+
+2. USB and sysfs:
 

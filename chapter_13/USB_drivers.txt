@@ -63,7 +63,7 @@ Isochronous endpoints also transfer large amounts of data, but the data is NOT a
 	bInterval: If this endpoint of type interrupt, this value is the interval setting for the endpoint - the time between interrupt requests for the endpoint.
 
 * Interfaces:
-USB endpoints are bundled up into interfaces. USB interfaces handle only one type of a USB logical connection, such as a mouse, a keyboard, etc. Because a USB interface represents basic functionality, each USB driver controls an interface. USB interfaces are described in the kernel with @usb_interface, some of the important fields in it are:
+USB endpoints are bundled up into interfaces. USB interfaces handle only one type of a USB logical connection, such as a mouse, a keyboard, etc. Because a USB interface represents basic functionality, each USB driver controls an interface. USB interfaces are described in the kernel with @struct usb_interface (main USB device structure that all USB drivers use to communicate with the USB core.), some of the important fields in it are:
 	@struct usb_host_interface *altsetting: An array of interface structures containing all of the alternate settings that may be selected for this interface. Each struct usb_host_interface consists of a set of endpoint configurations as defined by the struct usb_host_endpoint.
 	@unsigned num_altsetting: number of alternate settings pointed to by the altsetting pointer.
 	@struct usb_host_interface *cur_altsetting: A pointer into the array altsetting, denoting the currently active setting for this interface.
@@ -185,7 +185,7 @@ Functions used to register and unregister a specific struct usb_interface * with
 
 5. USB transfers without urbs:
 Sometimes a USB driver doesn't want to go through all of the hassle of creating a @struct urb, initializing it, and then waiting for the urb completion function to run, just to send or receive some simple USB data.
-i) usb_bulk_msg:
+i)   usb_bulk_msg():
 	int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe, void *data, int len, int *actual_length, int timeout);
 	@usb_dev: The pointer to the USB device to send to or receive from the bulk message.
 	@pipe: The specific endpoint of the USB device to which this bulk message is to be sent. This value is created with a call to either usb_sndbulkpipe() or usb_rcvbulkpipe().
@@ -193,4 +193,15 @@ i) usb_bulk_msg:
 	@len: The length of the buffer pointed to by @data.
 	@actual_length: A pointer to where the function places the actual number of bytes that have either been transferred to or received from the device.
 	@timeout: The amount of time, in jiffies, that should be waited before timing out. If this value is 0, the function waits forever for the message to complete.
-If the function is successful, the return value is 0; otherwise a negative error number is returned.
+If the function is successful, the return value is 0; otherwise a negative error number is returned. If successful, the actual_length parameter contains the number of bytes that were transferred or received from this message.
+
+ii)  usb_control_msg():
+	int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __requesttype, __u16 value, __u16 index, void *data, __u16 size, int timeout);
+	If successful, it returns the number of bytes that were transferred to or from the device; otherwise, a nagative error number is returned. The parameters request, requesttype, value, and index all directly map to the USB specification for how a USB control message is defined.
+• Note that usb_bulk_msg() and usb_control_msg() cannot be called from within interrupt context or with a spinlock held. Also, they could not be canceled by any other function, so be careful when using it, make sure the driver's disconnect function knows enough to wait for the call to complete before allowing itself to be unloaded from memory.
+
+iii) Other USB data functions:
+A number of helper functions in the USB core can be used to retrieve standard information from all USB devices. These functions cannot be called from within interrupt context, or with spinlocks held.
+	int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char index, void *buf, int size); // It could be used by a USB driver to retrieve from the @struct usb_device any of the device descriptors that are not already present in the existing struct usb_device and struct usb_interface, such as audio descriptors or other class specific information. See the source code, it uses usb_confif_msg() to do this.
+	int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char index, void *buf, int size); // If successful, this function returns a string encoded in the UTF-16LE format in the buffer pointed to by the @buf. As this format is usually not very useful, there's another function:
+	int usb_string(struct usb_device *dev, int index, char *buf, size_t size); // If successful return a string read from a USB device and is already converted into UTF-8 format. So usb_string() is recommended instead of usb_get_string().

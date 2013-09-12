@@ -187,3 +187,10 @@ Functions used to register and unregister a specific struct usb_interface * with
 Sometimes a USB driver doesn't want to go through all of the hassle of creating a @struct urb, initializing it, and then waiting for the urb completion function to run, just to send or receive some simple USB data.
 i) usb_bulk_msg:
 	int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe, void *data, int len, int *actual_length, int timeout);
+	@usb_dev: The pointer to the USB device to send to or receive from the bulk message.
+	@pipe: The specific endpoint of the USB device to which this bulk message is to be sent. This value is created with a call to either usb_sndbulkpipe() or usb_rcvbulkpipe().
+	@data: A pointer to the data to send to the device if this is an OUT endpoint; if this is an IN endpoint, this is a pointer to where the data should be placed after being read from the device.
+	@len: The length of the buffer pointed to by @data.
+	@actual_length: A pointer to where the function places the actual number of bytes that have either been transferred to or received from the device.
+	@timeout: The amount of time, in jiffies, that should be waited before timing out. If this value is 0, the function waits forever for the message to complete.
+If the function is successful, the return value is 0; otherwise a negative error number is returned.

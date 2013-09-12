@@ -144,4 +144,27 @@ If the call to usb_submit_urb() is successful, it returns 0; otherwise it return
 To stop the urb that has been submitted to the USB core, the functions usb_kill_urb() or usb_unlink_urb() should be called:
 	int usb_kill_urb(struct urb *urb);
 	int usb_unlink_urb(struct urb *urb);
+When the function usb_kill_urb() is called, the urb lifecycle is stopped. This function is usually used when the device is disconnected from the system in the disconnect callback.
+For some drivers, the usb_unlink_urb() should be used to tell the USB core to stop a urb. This function doesn't wait for the urb to be fully stopped before returning to the caller. This is useful for stopping the urb while in an interrupt handler or when a spinlock is held. This function requires that the URB_ASYNC_UNLINK flag be set in the urb that is being asked to be stopped in order to work properly.
 
+
+4. Writing a USB driver:
+Writing a USB driver is similar to a pco driver: the driver registers its driver object with the USB subsystem and later uses vendor and device identifiers to tell if its hardware has been installed.
+• The @struct usb_device_id provides a list of different types of USB devices that this driver supports.
+As with PCI drivers, the @MODULE_DEVICE_TABLE macro is necessary to allow user-space tools to figure out what devices this driver can control. But for USB drivers, the string "usb" must be the first value in the macro. For example:
+	MODULE_DEVICE_TABLE(usb, skel_table);
+
+• Registering a USB driver:
+The main structure that all USB driver must create is @struct usb_driver, which consists of a number of function callbacks and variables that describe the USB driver to the USB core code:
+	@struct module *owner: often set to THIS_MODULE.
+	@const char *name: It must be unique among all USB drivers in the kernel. It shows in sysfs under /sys/bus/usb/drivers/.
+	@const struct usb_device_id *id_table: Pointer to struct usb_device_id that contains a list of all of the different kinds of USB devices this driver can accept. If this variable is not set, the probe() function in the USB driver is never called. And if you want your driver to be always called for every USB device in the system, create an entry that sets only the @driver_info field:
+	static struct usb_device_id usb_ids[] = {
+		{ .driver_info = 42 },
+		{}
+	};
+	int (*probe)(struct usb_interface *intf, const struct usb_device_id *id): This function is called by the USB core when it thinks it has a @struct usb_interface that this driver can handle. A pointer to the @struct usb_device_id that the USB core used to make this decision is also passed to this function. If the USB driver claims the struct usb_interface that is passed to it, it should initialize the device properly and return 0. If the driver doesn't want to claim the device, or an error occurs, it should return a nagative error value.
+	void (*disconnect)(struct usb_interface *intf): This function is called by the USB core when the @struct usb_interface has been removed from the system or when the driver is being unloaded from the USB core.
+	int (*ioctl)(struct usb_interface *intf, unsigned int code, void *buf): It is called when a user-space program makes a ioctl() call on the usbfs filesystem.
+	int (*suspend)(struct usb_interface *intf, u32 state);
+	int (*resume)(struct usb_interface *intf);

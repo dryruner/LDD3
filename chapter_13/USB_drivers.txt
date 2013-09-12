@@ -168,3 +168,22 @@ The main structure that all USB driver must create is @struct usb_driver, which 
 	int (*ioctl)(struct usb_interface *intf, unsigned int code, void *buf): It is called when a user-space program makes a ioctl() call on the usbfs filesystem.
 	int (*suspend)(struct usb_interface *intf, u32 state);
 	int (*resume)(struct usb_interface *intf);
+* To register a @usb_driver with the USB core:
+	int usb_register(struct usb_driver *driver);
+	void usb_deregister(struct usb_driver *driver);
+
+* probe and disconnect in detail:
+Both the probe and disconnect function callbacks are called in the context of the USB hub kernel thread, so it is legal to sleep within them. However, it's recommended that the majority of the work be done when the device is opened by a user if possible, in order to keep the USB probing time to a minimum. This is because the USB core handles the addition and removal of USB devices in a single thread, so any slow device driver can cause the USB device detection time to slow down and become noticeable by the user.
+• Because the USB driver needs to retrieve the local data structure that is associated with this @struct usb_interface later in the lifecycle of the device, the following function could be called:
+	void usb_set_intfdata(struct usb_interface *intf, void *data); // set the private data pointer within the usb_interface.
+	void *usb_get_intfdata(struct usb_interface *intf);
+• struct usb_class_driver: A structure that describes a USB driver that wants to use the USB major number to communicate with user-space programs. 
+	int usb_register_dev(struct usb_interface *intf, struct usb_class_driver *class_driver);
+	void usb_deregister_dev(struct usb_interface *intf, struct usb_class_driver *class_driver);
+Functions used to register and unregister a specific struct usb_interface * with a struct usb_class_driver *.
+
+
+5. USB transfers without urbs:
+Sometimes a USB driver doesn't want to go through all of the hassle of creating a @struct urb, initializing it, and then waiting for the urb completion function to run, just to send or receive some simple USB data.
+i) usb_bulk_msg:
+	int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe, void *data, int len, int *actual_length, int timeout);

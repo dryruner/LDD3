@@ -1,0 +1,4 @@
+1. Kobject, kobj_type, and kset:
+Kobject subsystem handles the generation of events that notify user space about the comings and goings of hardware on the system.
+• Kobject basics (also see LKD/chapter_17):
+

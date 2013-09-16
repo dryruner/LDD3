@@ -1,4 +1,22 @@
 1. Kobject, kobj_type, and kset:
 Kobject subsystem handles the generation of events that notify user space about the comings and goings of hardware on the system.
-• Kobject basics (also see LKD/chapter_17):
+i) Kobject basics (also see LKD/chapter_17):
+It's rare for kernel code to create a standalone kobject, instead, kobjects are always found embedded in other structures.
+
+• kobject initialization:
+* The first is to set the entire kobject to 0, usually with a call to memset(). Failure to zero out a kobject often leads to very strange crashes further down the line, this step shouldn't be omitted.
+* The next step is to set up some of the internal fields with a call to kobject_init(): (also see LKD/chapter_17)
+	void kobject_init(struct kobject *kobj, struct kobj_type *ktype);
+	int kobject_set_name(struct kobject *kobj, const char *fmt, ...); // set the name of the kobject, which is used in sysfs entries. Note that this call may fail, so you should check its return value.
+
+• Reference count manipulation:
+	struct kobject *kobject_get(struct kobject *kobj); // Increase kobj's ref_cnt by 1.
+	void kobject_put(struct kobject *kobj);  // Decrease kobj's ref_cnt by 1, and if it becomes 0, the release() function pointed at by the kobj_type associated with the kobject is invoked.
+Note that in many cases, the reference count in the kobject itself may not be sufficient to prevent race conditions. The existence of a kobject may require the continued existence of the module that created that kobject. It would not do to unload that module while the kobject is still being passed around. See source code of cdev_get().
+
+• Release functions and kobj_type:
+Every kobject must have a release() method, which is embedded in kobj_type.
+	struct kobj_type *get_ktype(struct kobject *kobj);  // finds the kobj_type pointer for a given kobject.
+
+• kobject hierarchies, kset:
 

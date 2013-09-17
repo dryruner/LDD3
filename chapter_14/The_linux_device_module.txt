@@ -19,4 +19,29 @@ Every kobject must have a release() method, which is embedded in kobj_type.
 	struct kobj_type *get_ktype(struct kobject *kobj);  // finds the kobj_type pointer for a given kobject.
 
 • kobject hierarchies, kset:
+* kobject structure has a parent pointer, which is used to position the object in the sysfs hierarchy.
+* kset is used as containment, it can be thought of as the top-level container class for kobjects. It's worth noting that ksets are always represented in sysfs once a kset has been set up and added to the system, there will be a sysfs directory for it. Kobjects do not necessarily show up in sysfs, but every kobject that is a member of a kset is represented there.
+	int kobject_add(struct kobject *kobj, struct kobject *parent, const char *fmt, ...); // see LKD/chapter_17 for more details.
+	void kobject_del(struct kobject *kobj); // Remove a kobject's sysfs representation
+* A kset keeps its children in a standard kernel linked list. In almost all cases, the contained kobjects also have pointers (parent pointer) to the kset (or strictly, kset's embedded kobject)
+        ----------------------
+        | kset   ----------- | 
+|------>|        | kobject | |----------     ----> : kset child list
+|       ----------------------         |           
+|         ^  ^        ^   ^            |         ^
+|        // //       /   /             |        // : kobject->kset
+|                                      |
+|   -----------		 -----------       |        ^
+<---| kobject | <--- | kobject | <------       /   : kobject->parent
+    -----------      -----------
 
+* Operations on kset:
+	void kset_init(struct kset *kset);  
+	int kset_register(struct kset *kset); // initialize and add a kset
+	void kset_unregister(struct kset *kset);
+	struct kset *kset_get(struct kset *kset); // manage the reference counts of ksets.
+	void kset_put(struct kset *kset);
+Note that a kset's ref_cnt is actually its embedded kobject's reference count.
+
+
+2. Low-level sysfs operations:

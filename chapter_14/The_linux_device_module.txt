@@ -45,3 +45,18 @@ Note that a kset's ref_cnt is actually its embedded kobject's reference count.
 
 
 2. Low-level sysfs operations:
+For every directory found in sysfs, there is a kobject lurking somewhere within the kernel (kobject is embedded in kset). Every kobject of interest also exports one or more attributes, which appear in that kobject's sysfs directory as files containing kernel-generated information.
+• kobject_add() see LKD/chapter_17's notes. Sysfs entries for kobjects are always directories, so a call to kobject_add() results in the creation of a directory in sysfs. Usually that directory contains one or more attributes.
+i) Default attributes:
+When created, every kobject is given a set of default attributes. These attributes are specified by way of the kobj_type structure:
+	struct kobj_type {
+		void (*release)(struct kobject *);
+		struct sysfs_ops *sysfs_ops;
+		struct attribute **default_attrs;
+	};
+The @default_attrs field lists the attributes to be created for _EVERY_ kobject of this type, and sysfs_ops provides the methods to implement those attributes. Note that the last entry in @default_attrs must be NULL.
+	struct sysfs_ops {
+		ssize_t (*show)(struct kobject *kobj, struct attribute *attr, char *buffer);
+		ssize_t (*store)(struct kobject *kobj, struct attribute *attr, const char *buffer, size_t size);
+	};
+The same show/store method is used for all attributes associated with a given kobject. (See fs/sysfs/file.c: fill_read_buffer(), flush_write_buffer(). See also drivers/base/core.c: device_initialize(), device_ktype, etc.) The 

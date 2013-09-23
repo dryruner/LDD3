@@ -47,7 +47,7 @@ Note that a kset's ref_cnt is actually its embedded kobject's reference count.
 2. Low-level sysfs operations:
 For every directory found in sysfs, there is a kobject lurking somewhere within the kernel (kobject is embedded in kset). Every kobject of interest also exports one or more attributes, which appear in that kobject's sysfs directory as files containing kernel-generated information.
 • kobject_add() see LKD/chapter_17's notes. Sysfs entries for kobjects are always directories, so a call to kobject_add() results in the creation of a directory in sysfs. Usually that directory contains one or more attributes.
-i) Default attributes:
+i)   Default attributes:
 When created, every kobject is given a set of default attributes. These attributes are specified by way of the kobj_type structure:
 	struct kobj_type {
 		void (*release)(struct kobject *);
@@ -59,4 +59,31 @@ The @default_attrs field lists the attributes to be created for _EVERY_ kobject 
 		ssize_t (*show)(struct kobject *kobj, struct attribute *attr, char *buffer);
 		ssize_t (*store)(struct kobject *kobj, struct attribute *attr, const char *buffer, size_t size);
 	};
-The same show/store method is used for all attributes associated with a given kobject. (See fs/sysfs/file.c: fill_read_buffer(), flush_write_buffer(). See also drivers/base/core.c: device_initialize(), device_ktype, etc.) The 
+The same show/store method is used for all attributes associated with a given kobject. (See fs/sysfs/file.c: fill_read_buffer(), flush_write_buffer(). See also drivers/base/core.c: device_initialize(), device_ktype, etc.) The show() method should encode the value into buffer, which length is limited to PAGE_SIZE. The store() method should decode the data stored in buffer and respond to the kernel, note that you should validate it carefully because it comes from user space.
+• Nondefault attributes:
+If you wish to add a new attribute to a kobject's sysfs directory:
+	int sysfs_create_file(struct kobject *kobj, struct attribute *attr);
+Note that the same show() and store() functions are called to implement operations on the new attribute.
+
+ii)  Binary attributes:
+Here's need to pass large chunks of binary data between user space and kernel space, like uploading firmware to devices. 
+	struct bin_attribute {
+		struct attribute attr;
+		size_t size;
+		void *private;
+		ssize_t (*read)(struct kobject *kobj, struct bin_attribute *bin_attr, char *buffer, loff_t pos, size_t size);
+		ssize_t (*write)(struct kobject *kobj, struct bin_attribute *bin_attr, char *buffer, loff_t pos, size_t size);
+		int (*mmap)(struct kobject *kobj, struct bin_attribute *bin_attr, struct vm_area_struct *vma);
+	};
+The @size is the maximum size of the binary attribute (or 0 if there is no maximum). Note there's no way for sysfs to signal the last of a set of write operations, so code implementing a binary attribute must be able to determine the end of the data some other way.
+	int sysfs_create_bin_file(struct kobject *kobj, struct bin_attribute *attr);
+	int sysfs_remove_bin_file(struct kobject *kobj, struct bin_attribute *attr);
+
+iii) Symbolic links:
+	int sysfs_create_link(struct kobject *kobj, struct kobject *target, const char *name); // Creates a link (called @name) pointing to target's sysfs entry as an attribute of kobj.
+	void sysfs_remove_link(struct kobject *kobj, const char *name);
+Note that the link persists even if target is removed from the system. So you should probably have a way of knowing about changes to those kobjects or some sort of assurance that the target kobjects will not disappear.
+
+iv)  Hotplug event generation (uevent):
+
+

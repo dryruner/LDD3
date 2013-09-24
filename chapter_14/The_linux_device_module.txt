@@ -85,5 +85,23 @@ iii) Symbolic links:
 Note that the link persists even if target is removed from the system. So you should probably have a way of knowing about changes to those kobjects or some sort of assurance that the target kobjects will not disappear.
 
 iv)  Hotplug event generation (uevent):
+A hotplug event is a notification to user space from the kernel that something has changed in the system's configuration. They are generated whenever(after) a kobject is created or destroyed. Before the event is handed to user space, code associated with the kobject (or more specifically the kset to which it belongs) has the opportunity to add information for user space or to disable event generation entirely.
+	struct kset_uevent_ops {
+		int (*filter)(struct kset *kset, struct kobject *kobj);
+		const char *(*name)(struct kset *kset, struct kobject *kobj);
+		int (*uevent)(struct kset *kset, struct kobject *kobj, struct kobj_uevent_env *env);
+	};
+	struct kobj_uevent_env {
+		char *envp[UEVENT_NUM_ENVP];
+		int envp_idx;
+		char buf[UEVENT_BUFFER_SIZE];
+		int buflen;
+	};
+• A pointer to this structure is found in the @kset_uevent_ops field of the kset structure. If a given kobject is not contained within a kset, the kernel searches up through the hierarchy (use parent pointer) until it finds a kobject that does have a kset, that kset's kset_uevent_ops is then used.
+• The @filter function is called whenever kernel is considering generating an event for a given kobject. If filter() returns 0, the event is not created. This method thus gives kset code an opportunity to decide which events should be passed on to user space. (See the source code of kobject_uevent_env().)
+• The @name function should return a simple string suitable for passing to user space.
+• The final @uevent function gives an opportunity to add useful environment variables prior to the invocation of that (user-space) script. The @envp array is used to store additional environment variable definitions (in the NAME=value format). It has @envp_idx entries in total. The variables themselves should be encoded into @buf, which is @buflen bytes long. Be sure to use NULL as the last entry in the envp. The return value should normally be 0, any nonzero return aborts the generation of the hotplug event.
 
+
+3. Buses, devices, and drivers:
 

@@ -104,8 +104,128 @@ A hotplug event is a notification to user space from the kernel that something h
 
 
 3. Buses, devices, and drivers:
-i) Buses:
+i)   Buses:
 A bus is a channel between the processor and one or more devices. Buses can plug into each other. See <linux/device.h>: struct bus_type { ...
 A new bus must be registered with the system via a call bus_register(); which could fail so the return value must always be checked. If succeed, the new bus subsystem has been added to the system and it is visible in sysfs under /sys/bus/.
 	int bus_register(struct bus_type *bus);
 	void bus_unregister(struct bus_type *bus);
+• Bus methods:
+	int (*match)(struct device *device, struct device_driver *driver); // This method is called multiple times whenever a new device or driver is added for this bus. It should return a nonzero value if the given device can be handled by the given driver. The function must be handled at bus level because that is where the proper logic exists.
+	int (*uevent)(struct device *device, struct kobj_uevent_env *env); // This allows the bus to add variables to the environment prior to the generation of a hotplug event in user space.
+• Iterating over devices and drivers:
+You may find yourself having to perform some operation on all devices or drivers that have been registered with your bus. To operate on every device known to the bus:
+	int bus_for_each_dev(struct bus_type *bus, struct device *start, void *data, int (*fn)(struct device *, void *)); // If @start is NULL the iteration begins with the first device on bus; otherwise iteration starts with the first device after start. If @fn returns a nonzero value, iteration stops and that value is returned from bus_for_each_dev.
+	int bus_for_each_drv(struct bus_type *bus, struct device_driver *start, void *data, int (*fn)(struct device_driver *, void *));
+• Bus attributes:
+	struct bus_attribute {
+		struct attribute attr;
+		ssize_t (*show)(struct bus_type *bus, char *buf);
+		ssize_t (*store)(struct bus_type *bus, const char *buf, size_t count);
+	};
+	BUS_ATTR(name, mode, show, store); // This macro declares a structure, generating its name by prepending the string "bus_attr_" to the given @name. See drivers/base/bus.c, bus_sysfs_ops.
+	int bus_create_file(struct bus_type *bus, struct bus_attribute *attr);
+	void bus_remove_file(struct bus_type *bus, struct bus_attribute *attr);
+
+ii)  Devices:
+	struct device {
+		...
+		void (*release)(struct device *dev); // This method is called when the last reference to the device is removed. All device structures registered with the core must have a release method, or the kernel prints out complains. See drivers/base/core.c: devide_ktype for more details.
+	}; // As a general rule, (dev->kobj).parent == &(dev->parent->kobj).
+• Device registration:
+	int device_register(struct device *dev);
+	void device_unregister(struct device *dev);
+• Device attributes:
+	struct device_attribute {
+		struct attribute attr;
+		ssize_t (*show)(struct device *dev, struct device_attribute *attr, char *buf);
+		ssiez_t (*store)(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
+	};
+	DEVICE_ATTR(name, mode, show, store); // This creates a structure with the name of prepending "dev_attr_" to the given @name.
+	int device_create_file(struct device *dev, struct device_attribute *attr);
+	void device_remove_file(struct device *dev, struct device_attribute *attr);
+• The @dev_attrs field in struct bus_type points to a list of default attributes created for every device added to that bus.
+• struct device is usually embedded within a higher-level representation of the device.
+
+iii) Device drivers:
+Device drivers can export information and configuration variables that are independent of any specific device.
+	struct device_driver {
+		const char *name;
+		struct bus_type *bus;
+		struct module *owner;
+		const char *mod_name;
+		bool suppress_bind_attrs;
+		int (*probe)(struct device *dev);
+		int (*remove)(struct device *dev);
+		void (*shutdown)(struct device *dev);
+		int (*suspend)(struct device *dev, pm_message_t state);
+		int (*resume)(struct device *dev, );
+		const struct attribute_group **groups;
+		const struct dev_pm_ops *pm;
+		struct driver_private *p;
+	};
+	int driver_register(struct device_driver *drv);
+	void driver_unregister(struct device_driver *drv);
+	struct driver_attribute {
+		struct attribute attr;
+		ssize_t (*show)(struct device_driver *drv, char *buf);
+		ssize_t (*store)(struct device_driver *drv, const char *buf, size_t count);
+	};
+	DRIVER_ATTR(name, mode, show, store);
+	int driver_create_file(struct device_driver *drv, struct driver_attribute *attr);
+	void driver_remove_file(struct device_driver *drv, struct driver_attribute *attr);
+• The struct bus_type contains a field @drv_attrs that points to a set of default attributes, which are created for all drivers associated with that bus.
+• struct device_driver is usually embedded within a higher-level, bus-specific structure.
+
+iv)  Classes:
+A class is a higher-level view of a device that abstracts out low-level implementation details.
+	struct class {
+		const char *name;
+		struct module *owner;
+		struct class_attribute *class_attrs;
+		struct device_attribute *dev_attrs;
+		struct kobject *dev_kobj;
+		int (*dev_uevent)(struct device *device, struct kobj_uevent_env *env);
+		char *(*devnode)(struct device *dev, mode_t *mode);
+		void (*class_release)(struct class *class);
+		void (*dev_release)(struct device *dev);
+		int (*suspend)(struct device *dev, pm_message_t state);
+		int (*resume)(struct device *dev);
+		const struct dev_pm_ops* pm;
+		struct class_private *p;
+	};
+Each class has a unique name, which appears under /sys/class/. When the class is registered, all of the attributes listed in the NULL-terminated array pointed to by @class_attrs is created. There's also a set of default attributes for every device added to the class, @dev_attrs points to them. @dev_release is called whenever a device is removed from the class; @class_release is called when the class itself is released.
+	int class_register(struct class *cls);
+	void class_unregister(struct class *cls);
+	struct class_attribute {
+		struct attribute attr;
+		ssize_t (*show)(struct class *cls, char *buf);
+		ssize_t (*store)(struct class *cls, const char *buf, size_t count);
+	};
+	CLASS_ATTR(name, mode, show, store);
+	int class_create_file(struct class *cls, const struct class_attribute *attr);
+	void class_remove_file(struct class *cls, const struct class_attribute *attr);
+• Class interfaces:
+	struct class_interface {
+		struct list_head node;
+		struct class *class;
+		int (*add_dev)(struct device *, struct class_interface *);
+		void (*remove_dev)(struct device *, struct class_interface *);
+	};
+	int class_interface_register(struct class_interface *intf);
+	void class_interface_unregister(struct class_interface *intf);
+* Class interface is a sort of trigger mechanism that can be used to get notification when devices enter or leave the class. Whenever a device is added to the class specified in clasS_interface, the @add_dev is called, it could perform any additional setup required for that device. When the device is removed from the class, the @remove_dev method is called to perform any required cleanup.
+* Multiple interfaces can be registered for a class.
+
+• Put it all together:
+See the picture of LDD3 P392, device-creation process.
+
+
+4. Hotplug:
+The kernel views hotplugging as an interaction between the hardware, the kernel, and the kernel driver. Users view hotplugging as the interaction between the kernel and user space.
+• udev: (also see the documentation of udev)
+For udev to work properly, all drivers need to ensure that any major and minor numbers assigned to a device controlled by the driver are exported to user space through sysfs. i) For any driver that uses a subsystem to assign it a major and minor number, this is already done by the subsystem, so driver needs to do nothing about it. (like tty, misc, usb, input, scsi, block, i2c, network, etc.)  ii) If the driver handles getting a major/minor number on its own, (through a call to cdev_init() or the older register_chrdev()), the driver needs to be modified in order for udev to work properly.
+* udev looks for a file called 'dev' in the /sys/class/ tree in order to determine what major and minor number is assigned to a specific device. A device driver merely need to create that file for every device it controls. (Could use print_dev_t() to properly format the major and minor number for the specific device.)
+
+
+5. Dealing with firmware:
+

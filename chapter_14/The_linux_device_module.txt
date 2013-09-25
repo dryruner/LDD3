@@ -228,4 +228,24 @@ For udev to work properly, all drivers need to ensure that any major and minor n
 
 
 5. Dealing with firmware:
+• The kernel firmware interface:
+The proper solution is to obtain the firmware from user space when you need it.
+	#include <linux/firmware.h>
+	struct firmware {
+		size_t size;
+		const u8 *data;
+		struct page **pages;
+	};
+	int request_firmware(const struct firmware **fw, const char *name, struct device *device); // A call to reques_firmware() requests user space to locate and provide a firmware image to the kernel. If a firmware is successfully loaded, it returns 0 and the @fw argument is set. fw contains the actual firmware, which can now be downloaded to the device.
+	void release_firmware(const struct firmware *fw); // After sent firmware to device, you should release the in-kernel structure.
+	int request_firmware_nowait(struct module *module, const char *name, struct device *device, void *context, void (*cont)(const struct firmware *fw, void *context));
+	// Since request_firmware() asks user space to help, it is guaranteed to sleep before returning. If your driver is not in a position allowed to sleep when it must ask for firmware, you must use the _nowait alternative. (@module is always set to THIS_MODULE, @context is a private data pointer not used by the firmware subsystem.) If all goes well request_firmware_nowait() begins a firmware load process and returns 0. At some future time @cont will be called with the result of the load.
 
+• How it works:
+The firmware subsystem works with sysfs and hotplug mechanism. When a call is made to request_firmware(), a new directory is created under /sys/class/firmware/ using your device's name. The directory contains 3 attributes:
+* loading: It should be set to 1 by the user-space process that is loading the firmware. When the load completes, it should be set to 0. Writing -1 to it aborts the firmware loading process.
+* data: It is a binary attribute that receives the firmware data itself. After setting loading, the user-space process should write the firmware to this attribute.
+* device: It is a symbolic link to the associated entry under /sys/devices.
+
+Once the sysfs entries have been created, the kernel generates a hotplug event for the device. The environment passed to the uevent handler includes a variable FIRMWARE, which is set to the name provided to request_firmware(). The handler should locate the firmware file, copy it to kernel using the atrributes provided. if the file couldn't be found, the handler should set the loading file to -1.
+If a firmware request isn't serviced within 10 seconds, the kernel gives up and returns a failure status to the driver. That time-out value can be changed via the sysfs entry /sys/class/firmware/timeout.

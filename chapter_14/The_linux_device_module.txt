@@ -104,4 +104,8 @@ A hotplug event is a notification to user space from the kernel that something h
 
 
 3. Buses, devices, and drivers:
-
+i) Buses:
+A bus is a channel between the processor and one or more devices. Buses can plug into each other. See <linux/device.h>: struct bus_type { ...
+A new bus must be registered with the system via a call bus_register(); which could fail so the return value must always be checked. If succeed, the new bus subsystem has been added to the system and it is visible in sysfs under /sys/bus/.
+	int bus_register(struct bus_type *bus);
+	void bus_unregister(struct bus_type *bus);

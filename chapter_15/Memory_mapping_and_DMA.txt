@@ -1,0 +1,112 @@
+1. Address types in linux:
+Linux is a virtual memory system, meaning that the address seen by user space do not directly correspond to the physical addresses used by the hardware.
+• User virtual addresses:
+Seen by the user space
+• Physical addresses:
+Used between the processor and the system's memory.
+• Bus addresses:
+Used between peripheral buses and memory. Often they are the same as the physical addresses used by the processor, but that is not necessarily the case.
+• Kernel logical addresses:
+These addresses map some portion (perhaps all) of main memory and are often treated as if they were physical addresses. On most architectures, logical addresses and their associated physical addresses differ only by a constant offset. Logical addresses use the hardware's native pointer size, so may be smaller than the whole physical address space. kmalloc() and __get_free_pages() return logical addresses.
+• Kernel virtual addresses:
+Kernel virtual addresses are a mapping from kernel-space addresses to physical addresses. Kernel virtual addresses do not necessarily have the linear, one-to-one mapping to physical addresses that like logical addresses do. All logical addresses are kernel virtual addresses, but many kernel virtual addresses are not logical addresses, like hign-mem addresses. vmalloc(), ioremap() and kmap() return the kernel virtual addresses.
+	#include <asm/page.h>
+	unsigned long __pa(void *kaddr); // convert a logical address to physical address
+	void * __va(unsigned long physaddr); // convert a physical address back to logical address, but only for low-memory pages. (high memory physical address has no corresponding logical address)
+
+• High and low memory:
+The difference between logical and kernel virtual addresses is highlighted on 32-bit systems that are equipped with large amounts of memory. The kernel (on x86 architecture) splits the 4GB virtual address space between user-space and the kernel. A typical split is 3GB user space and 1GB kernel space. The kernel's code and data structures must fit in this 1GB, but the biggest consumer of kernel address space is virtual mappings for physical memory. The kernel cannot directly manipulate memory that is not mapped into the kernel's address space. The kernel, in other words, needs its own virtual address for any memory it must touch directly. So for some 32-bit systems that have large than 4GB memory, only the lowest portion of memory has logical addresses, the rest (high memory) doesn not. Before accessing a specific high-memory page, the kernel must set up an explicit virtual mapping to make that page available in the kernel's address space. (Thus many kernel data structures must be placed in low memory; high memory tends to be reserved for user space process pages.)
+* Low memory:
+Memory for which logical addresses exist in kernel space. On almost every system you will likely encounter, all memory is low memory.
+* High memory:
+Memory for which logical address doesn't exist.
+On i386 systems, the boundary between low and high memory is usually set just under 1GB. This boundary is a limit set by the kernel itself as it splits 32-bit address space between kernel and user space.
+
+• There is one struct page for each physical page on the system. 
+	struct page *virt_to_page(void *kaddr); // Convert a logical address to its corresponding page structure.
+	struct page *pfn_to_page(int pfn); // Return the page structure of the given page frame number (PFN).
+	void *page_address(struct page *page); // Return the kernel virtual address (NOT logical address!) of this page. Only works for low memory and high memory that has been explicitly mapped.
+	#include <linux/highmem.h>
+	void *kmap(struct page *page); // Return a kernel virtual address for any page in the system. For low memory pages it just returns the logical address of that page; for high memory pages it creates a special mapping in a dedicated part of kernel address space. A number of such mappings is available, so it is better not to hold on to them for too long.
+	void kunmap(struct page *page);
+	#include <asm/kmap_types.h>
+	void *kmap_atomic(struct page *page); // A high-performance form of kmap(). Each architecture maintains a small list of slots for atomic kmaps.  
+	void kunmap_atomic(void *addr);
+
+• Virtual memory areas (VMA):
+Virtual memory area (VMA) is a kernel data structure used to manage distinct regions of a process's address space. The fields in /proc/<pid>/maps is like:
+	start-end perm offset major:minor inode image
+start, end: The beginning and ending virtual addresses for this memory area.
+perm: This field describes what the process is allowed to do with pages belonging to this area. The last character in this field is either 'p' for private or 's' for shared.
+offset: Where the memory area begins in the file that it is mapped to.
+major, minor: The major and minor number of the device holding the file that has been mapped.
+inode: The inode number of the mapped file.
+image: The name of the file that has been mapped.
+* The vm_area_struct structure:
+See LKD/chapter_15 for more details.
+Each process in the system (with exception of kernel threads) has a struct mm_struct that contains the process's list of virtual memory areas, page tables, and various other bits of memory management information, along with a semaphore (mmap_sem) and a spinlock (page_table_lock). Note that the mm_struct could be shared between processes, the linux implementation of threads works in this way.
+
+
+2. The mmap device operation:
+As far as drivers are concerned, memory mapping can be implemented to provide user programs with direct access to device memory. Whenever the program reads or writes in the assigned address range, it is actually accessing the device.
+The mmap method is part of the file_operations structure and is invoked when the mmap syscall is issued. The mmap() in the file_operations structure has the prototype:
+	int (*mmap)(struct file *file, struct vm_area_struct *vma);
+	@vma contains the information about the virtual address range that is used to access the device. Therefore much of the work has been done by the kernel, to implement mmap, the driver only has to build suitable page tables for the address range, and if necessary, replace vma->vm_ops with a new set of operations.
+There're 2 ways of building the page tables: i) doing it all at once with a function called remap_pfn_range(); or ii) doing it one page at a time via fault() VMA method.
+i)  Using remap_pfn_range():
+The job of building new page tables to map a range of physical addresses is handled by remap_pfn_range():
+	int remap_pfn_range(struct vm_area_struct *vma, unsigned long virt_addr, unsigned long pfn, unsigned long size, pgprot_t prot);
+	@vma: The virtual memory area into which the page range is being mapped.
+	@virt_addr: The user virtual address where remapping should begin. The function builds page tables for the virtual address range between (virt_addr) ~ (virt_addr + size).
+	@pfn: The page frame number corresponding to the physical address to which the virtual address should be mapped. The function affects physical addresses from:
+		(pfn << PAGE_SHIFT) ~ (pfn << PAGE_SHIFT + size)
+	@size: The size in bytes that the area being remapped.
+	@prot: The "protection" requested for the new VMA. The driver can (and should) use the value found in vma->vm_page_prot.
+• Adding VMA operations:
+The open method is invoked anytime a process forks and creates a new reference to the VMA. Note the explicit call to simple_vma_open, since the open method is not invoked on the initial mmap, we must call it explicitly if we want it to run.
+
+ii) Mapping memory with fault method:
+	int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
+	struct vm_fault {
+		unsigned int flags; // FAULT_FLAG_XXX flags
+		pgoff_t pgoff;  // logical page offset based on vma
+		void __user *virtual_address; // The faulting user virtual address.
+		struct page *page; // The fault handler should set a page here, unless VM_FAULT_NOPAGE is set.
+	};
+When a user process attempts to access a page in a VMA that is not present in memory, the associated fault method is called. fault() must set the struct page inside struct vm_fault that refers to the page the user wanted. It must also take care to increment the usage count for the page by calling get_page():
+	void get_page(struct page *page);
+This step is necessary to keep the reference count correct on the mapped pages. When a VMA is unmapped, the kernel decrements the usage count for every page in the area.
+• If the fault() method is left NULL, kernel code that handles page fault maps the zero page to the faulting virtual address. The zero page is a copy-on-write page that reads as 0. If a process writes to the page, it ends up modifying a private copy. (Therefore, if a process extends a mapped region by calling mremap(), and the driver hasn't implemented fault handler, the process ends up with zero-filled memory instead of a segmentation fault.)
+
+* Remapping RAM:
+An interesting limitation of remap_pfn_range() is that it gives access only to reserved pages and physical addresses above the top of physical memory. In linux a page of physical addresses is marked as "reserved" in the memory map to indicate that it is not available for memory management. Reserved pages are locked in memory and are the only ones that can be safely mapped to user space. 
+Therefore, remap_pfn_range() won't allow you to remap conventional addresses, which include the pages you obtain by calling __get_free_pages().
+The way to map real RAM to user space is to use vm_ops->fault to deal with page fault one at a time. (Don't quite understand about this part.)
+
+* Remapping kernel virtual addresses:
+Although it is really rare. 
+	struct page *vmalloc_to_page(void *vmaddr); // convert a kernel virtual address to its corresponding page structure.
+You should use remap_pfn_range() to remap I/O memory areas into user space. Addresses from ioremap are special and cannot be treated like normal kernel virtual addresses. (You should use readb and other I/O functions introduced in chapter 9.)
+
+3. Performing direct I/O:
+There are cases where it can be beneficial to perform I/O directly to or from user-space buffer. If the amount of data being transferred is large, transferring data directly without an extra copy through kernel space can speed up. But note that direct I/O doesn't always provide the performance boost that one might expect. The overhead of setting up direct I/O (which involves faulting in and pinning down the relevant user pages) can be significant, and the benefits of buffered I/O are lost. 
+Applications that use direct I/O often use asynchronous I/O operations as well. The key to implementing direct I/O in the 2.6 kernel is a function called: get_user_pages():
+	int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start, int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);
+	@tsk: A pointer to the task performing the I/O. This argument is almost always passed as current.
+	@mm: A pointer to the memory management structure describing the address space to be mapped. For driver use, this argument should always be current->mm.
+	@start: The page-aligned address of the user-space buffer.
+	@len: The length of the buffer in PAGE_SIZE.
+	@write: If write is nonzero, the pages are mapped for write access (that user space is performing a read operation).
+	@force: If set, tells get_user_pages() to override the protections on the given pages to provide the requested access. Drivers should always pass 0 to it.
+	@pages, @vmas: Output parameters. Upon successful completion, pages contain a list of pointers to the struct page structures describing the user-space buffer. And @vmas contains pointers to the associated VMAs. The parameters should point to arrays capable of holding at least @len pointers. Either parameter can be NULL, but you need at least the struct page pointers to actually operate on the buffer.
+This function also requires the mmap rw-semaphore for the address space be acquired in read mode before the call.
+The return value is the number of pages actually mapped. Upon successful completion, the caller has a pages array pointing to the user-space buffer, which is locked into memory. To operate on the buffer directly, the kernel-space code must turn each struct page pointer into a kernel virtual address with kmap() or kmap_atomic(). Usually, devices for which direct I/O is justified are using DMA operations, so your driver will probably want to create a scatter/gather list from the array of struct page pointers. See the following section "Scatter/gather mappings".
+• Once the direct I/O operation is complete, you must release the user pages. Before doing so, you might need to inform the kernel if you changed the contents of those pages, otherwise the kernel may free the pages without writing them out to the backing store:
+	#include <linux/page-flags.h>  // see TESTPAGEFLAG() macro
+	if (!PageReserved(page))  // Most of the code that performs this operation checks first to ensure that the page is not in the reserved part of memory map, which is never swapped out.
+		set_page_dirty(page);
+	
+	void page_cache_release(struct page *page); // Regardless of whether the pages have been changed, they must be freed from the page cache.
+
+* Asynchronous I/O:
+

@@ -109,4 +109,17 @@ The return value is the number of pages actually mapped. Upon successful complet
 	void page_cache_release(struct page *page); // Regardless of whether the pages have been changed, they must be freed from the page cache.
 
 * Asynchronous I/O:
+Asynchronous I/O allows user space to initiate operations without waiting for their completion. Block and network drivers are fully asynchronous at all times, so only char drivers are candidates for explicit asynchronous I/O support. A char device can benefit from this support if there are good reasons for having more than one I/O operation outstanding at any given time.
+Drivers supporting asynchronous I/O should include <linux/aio.h>. There're 3 file_operations methods for the implementation of asynchronous I/O:
+	ssize_t (*aio_read)(struct kiocb *iocb, const struct iovec *iovec, unsigned long count, loff_t offset);
+	ssize_t (*aio_write)(struct kiocb *iocb, const struct iovec *iovec, unsigned long count, loff_t offset);
+	int (*aio_fsync)(struct kiocb *iocb, int datasync);
+The purpose of aio_read and aio_write methods is to initiate a read or write operation that may or may not be complete by the time they return. So it is entirely correct for the aio_read to perform like read, although it is useless.
+• If you support asynchronous I/O, you must be aware of the fact that the kernel can, on occasion, create "synchronous IOCBs". That is to say, asynchronous operations that must actually be executed synchronously. Your driver can query the status with: 
+	int is_sync_kiocb(struct kiocb *iocb); // If it returns a nonzero value, your driver must execute the operation synchronously.
+If your driver is able to initiate the asynchronous operation, it must do two things: i) remembering everything it needs to know about the operation, and return -EIOCBQUEUED to the caller. ii) When "later" comes, your driver must inform the kernel that the operation has completed. This is done with a call to aio_complete:
+	int aio_complete(struct kiocb *iocb, long res, long res2); // res is the usual result status for the operation; res2 is a second result code that will be returned to user space. Most asynchronous I/O implementations pass res2 as 0. Once you call aio_complete, you should not touch the IOCB or user buffer again.
 
+
+4. Direct memory access:
+DMA is the hardware mechanism that allows peripheral components to transfer their I/O data directly to and from main memory without the need to involve the processor.

@@ -122,4 +122,81 @@ If your driver is able to initiate the asynchronous operation, it must do two th
 
 
 4. Direct memory access:
-DMA is the hardware mechanism that allows peripheral components to transfer their I/O data directly to and from main memory without the need to involve the processor.
+DMA is the hardware mechanism that allows peripheral components to transfer their I/O data directly to and from main memory without the need to involve the processor. The efficient DMA handling relies on interrupt reporting. DMA also requires device drivers to allocate one or more special buffers suited to DMA.
+• Allocating the DMA buffer:
+When the DMA buffer is bigger than one page, they must occupy contiguous pages in physical memory, because the device transfers data using ISA or PCI buses, both of which carry physical addresses. 
+• DMA-based hardware uses bus addresses rather than physical address. Although ISA and PCI bus addresses are simply physical addresses on the PC, this is not true for every platform. The kernel provides a portable solution:
+	#include <asm/io.h>
+	unsigned long virt_to_bus(volatile void *address); // convert kernel logical address to bus address.
+	void *bus_to_virt(unsigned long address);
+They are discouraged to use, because they do not work in any situation where an I/O memory management unit must be programmed or where bounce buffers must be used. The right way of performing this conversion is with the generic DMA layer.
+
+• The generic DMA layer:
+i)  Dealing with difficult hardware:
+By default, the kernel assumes your device can perform DMA to any 32-bit address. If this is not the case, you must inform the kernel:
+	#include <linux/dma-mapping.h>
+	int dma_set_mask(struct device *dev, u64 mask); // If your device is limited to 24 bits, you should pass mask as 0x00FFFFFF.
+It returns nonzero if DMA is possible with the given mask; otherwise, you are not able to use DMA operations with this device.
+ii) DMA mappings:
+• A DMA mapping is a combination of allocation a DMA buffer and generating an address for that buffer that is accessible by the device.
+• Setting up a useful address for the device may also, in some cases, require the establishment of a bounce buffer. Bounce buffer is created when a driver attempts to perform DMA on an address that is not reachable by the peripheral device. Data is then copied to and from the bounce buffer as needed.
+• The PCI code distinguishes between two types of DMA mappings, depending on how long the DMA buffer is expected to stay around:
+i)  Coherent DMA mappings:
+These mappings usually exist for the life of the driver. It can be expensive to set up and use.
+ii) Streaming DMA mappings:
+Streaming mappings are usually set up for a single operation. Some architectures allow significant optimizations when streaming mappings are used.
+
+i)  Setting up coherant DMA mappings:
+	void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle, gfp_t flag); // @size: the size of the buffer needed. 
+	The return value is the kernel virtual address for the buffer; the associated bus address is stored in @dma_handle.
+	void dma_free_coherent(struct device *dev, size_t size, void *vaddr, dma_addr_t dma_handle); // return the buffer to the system; note that the size, kernel virtual address, bus address should be same as dma_alloc_coherent.
+• DMA pools:
+A DMA pool is an allocation mechanism for small, coherent DMA mappings. Note that mappings obtained from dma_alloc_coherent() may have a minimum size of one page. If you need smaller DMA areas than that, you should use a DMA pool.
+	struct dma_pool *dma_pool_create(const char *name, struct device *dev, size_t size, size_t align, size_t allocation);
+	@size: the size of the buffer to be allocated from this pool.
+	@align: the required hardware alignment for allocations from the pool in bytes.
+	@allocation: if nonzero, a memory boundary that allocations should not exceed.
+	void dma_pool_destroy(struct dma_pool *pool);
+	void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags, dma_addr_t *handle); // a region of memory (of the size specified when the pool is created) is allocated and returned. As with dma_alloc_coherent(), the address of the resulting DMA buffer is returned as the kernel virtual address and bus address is stored in handle.
+	void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t addr);
+
+ii) Setting up streaming DMA mappings:
+When setting up a streaming mapping, you must tell the kernel in which direction the data is moving: enum dma_data_direction
+DMA_TO_DEVICE
+DMA_FROM_DEVICE
+DMA_BIDIRECTIONAL: data can moved in either direction.
+DMA_NONE: only as a debugging aid.
+When you have a single buffer to transfer, use:
+	dma_addr_t dma_map_single(struct device *dev, void *buffer, size_t size, enum dma_data_direction direction);
+* Note that once the buffer has been mapped, it belongs to the device, not the processor. Until the buffer has been unmapped, the driver should not touch its contents in any way. Only after dma_unmap_single() has been called is it safe for the driver to access the contents of the buffer.
+* Occasionally a driver needs to access the contents of a streaming DMA buffer without unmapping it:
+	void dma_sync_single_for_cpu(struct device *dev, dma_handle_t bus_addr, size_t size, enum dma_data_direction direction); // This function should be called before the processor accesses a streaming DMA buffer. Once the call is made, the CPU owns the DMA buffer and can work with it as needed.
+	void dma_sync_single_for_device(struct device *dev, dma_handle_t bus_addr, size_t size, enum dma_data_direction direction);
+
+• Single-page streaming mappings:
+Occasionally you may want to set uo a mapping on a buffer for which you have a struct page pointer (This can happen with user-space buffers mapped with get_user_pages). You could use the following:
+	dma_addr_t dma_map_page(struct device *dev, struct page *page, unsigned long offset, size_t size, enum dma_data_direction direction);
+	void dma_unmap_page(struct device *dev, dma_addr_t dma_address, unsigned long offset, size_t size, enum dma_data_direction direction);
+	The @offset and @size arguments can be used to map part of a page, but this is not recommended.
+
+• Scatter/gather mappings:
+Scatter/gather mapping is a special type of streaming DMA mapping. Many devices can accept a scatterlist of array pointers and lengths, and transfer them all in one DMA operation. 
+	#include <asm/scatterlist.h>
+	struct scatterlist { // see the source code for more details
+		unsigned long page_link; // contains the struct page * pointer corresponding to the buffer to be used in the scatter/gather operation.
+		unsigned int offset;
+		unsigned int length; // the length of the buffer and its offset with in the page
+		dma_addr_t dma_address;
+	};
+	dma_addr_t sg_dma_address(struct scatterlist *sg); // return the bus address from this scatter list entry.
+	unsigned int sg_dma_len(struct scatterlist *sg); // return the length of this buffer.
+	int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents, enum dma_data_direction direction);
+	void dma_unmap_sg(struct device *dev, struct scatterlist *list, int nents, enum dma_data_direction direction);
+	void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nents, enum dma_data_direction direction);
+	void dma_sync_sG_for_device(struct device *dev, struct scatterlist *sg, int nents, enum dma_data_direction direction);
+
+• A simple PCI DMA example
+See LDD3 P453.
+
+• DMA for ISA devices:
+See LDD3 for more details.

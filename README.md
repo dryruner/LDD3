@@ -13,3 +13,4 @@
 * Chapter 13: USB Drivers
 * Chapter 14: The Linux Device Module
 * Chapter 15: Memory Mapping and DMA
+* Chapter 16: Block Drivers

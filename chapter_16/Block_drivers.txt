@@ -60,7 +60,7 @@ Request queues also implement a plug-in interface that allows the use of multipl
 * Queue creation and deletion:
 	struct request_queue *blk_init_queue(request_fn_proc *request, spinlock_t *lock); // (allocates memory) creates and initializes a request queue. In initialization, you can also set the field @void *queuedata to any value you like.
 	void blk_cleanup_queue(struct request_queue *q); // To return a request queue to the system (at module unload time, generally)
-	struct request *__elv_next_request(struct request_queue *q); // Return the next request to be processed. It leaves the request on the queue, but marks it as being active; this prevents the I/O scheduler from attempting to merge other requests with this one once you start to execute it.
+	struct request *blk_peek_request(struct request_queue *q); // Return the next request to be processed. It leaves the request on the queue, but marks it as being active; this prevents the I/O scheduler from attempting to merge other requests with this one once you start to execute it.
 	void blk_dequeue_request(struct request *rq); // To actually remove a request from a queue.
 	void elv_requeue_request(struct request_queue *q, struct request *rq); // To put a dequeued request back on the queue
 	void blk_stop_queue(struct request_queue *q); 
@@ -89,4 +89,48 @@ struct bio, see LKD chapter_14 and source code for more details. By the time a b
 	void bio_kunmap_irq(char *buffer, unsigned long *flags);
 
 • Some fields in struct request:
+@struct list_head queuelist: Embedded linked list structure. Note that all the requests of the request queue are in a linked list.
+@struct bio *bio: The linked list of bio structures for this request.
+@char *buffer: Kernel virtual address of the current segment (which the data should be transferred), if available.
+@unsigned short nr_phys_segments: The number of distinct segments occupied by this request in physical memory after adjacent pages have been merged.
 
+• Barrier requests:
+The block reorders requests before your driver sees them to improve I/O performance. Your driver can also reorder requests to the drive and letting the hardware figure out the optimal ordering. But if some applications require guarantees that certain operations will complete before other are started, in this case, you have to use a barrier request. If a request is marked with the REQ_HARDBARRERcflag, it must be written to the drive (the data must actually reside and be persistent on the physical media) before any following request is initiated.
+
+• Nonretryable requests:
+Block drivers often attempts to retry requests that fail the first time. However, the kernel sometimes marks requests as not being retryable. Such requests should simply fail as quickly as possible if they cannot be executed on the first try. If your driver is considering retrying a failed request, it should first make a call to:
+	int blk_noretry_request(struct request *rq);
+If the macro returns a nonzero value, your driver should simply abort the request with an error code instead of retrying it.
+
+• Block requests and DMA:
+A block driver can certainly step through the bio structures, creating a DMA mapping for each one and pass the result to the device. There's an easy way if your device can do scatter/gather I/O:
+	int blk_rq_map_sg(struct request_queue *q, struct request *rq, struct scatterlist *list);
+This function fills in the given @list with the full set of segments from the given request. Segments that are adjacent in memory are coalesced prior to insertion into the scatterlist. The return value is the number of entries in the list. The function also passes back the @list argument that could be passed to dma_map_sg(). (Your driver must allocate the storage for the scatterlist before calling blk_rq_map_sg(). Note that the list must be able to hold at least as many entries as the request has physical segments - @nr_phys_segments in the struct request holds the value.) Note that if you do not want blk_rq_map_sg() to coalesce adjacent segments, you can change the default behavior with a call:
+	clear_bit(QUEUE_FLAG_CLUSTER, &queue->queue_flags);
+
+
+• Doing without a request queue:
+Many block-oriented devices, such as flash memory arrays, ramdisks that have truly random-access performance and do not benefit from advanced request queueing logic. For these kind of devices, it would be better to accept requests directly from the block layer and not bother with the request queue at all.
+* The block layer supports a "no queue" mode of operation. Your driver must provide a "make request" function, rather than a request() function.
+	typedef void (make_request_fn)(struct request_queue *q, struct bio *bio);
+Note that a request_queue is still present, even though it will never actually hold any requests. @bio in the make_request_fn represents one or more buffers to be transferred. The make_request_fn can do two things: it can either perform the transfer directly, or it can redirect the request to another device.
+i)  Performing the transfer directly:
+It is just a matter of working through the bio. Since there's no request structure to work with, your function should signal completion directly to the creator of the bio structure with the call:
+	void bio_endio(struct bio *bio, int error);
+The make_request_fn should return 0, regardless of whether the I/O is successful or not; errors are indicated by providing a nonzero value for the @error parameter in bio_endio.
+ii) Redirecting the request to another device:
+Some block drivers, such as those implementing volume manages and software RAID arrays, need to redirect the request to another device that handles the actual I/O. But note that if the make_request_fn returns a nonzero value, the bio is submitted again.
+* Either way, you must tell the block subsystem that your driver is using a custom make_request_fn function. To do so, you must first allocate a request queue with:
+	struct request_queue *blk_alloc_queue(gfp_t flags); // This differs from blk_init_queue() in that it doesn't actually set up the queue to hold requests.
+Once you have a queue, pass it and your make_request_fn to blk_queue_make_request:
+	void blk_queue_make_request(struct request_queue *q, make_request_fn *func);
+* Actually all queue have a make_request_fn function; the default verison, generic_make_request(), handles the incorporation of the bio into a request structure. By providing a make_request_fn of its own, a driver just overrides the default one.
+
+• Command pre-preparation:
+The block layer provides a mechanism for drivers to examine and preprocess requests before they are returned from blk_peek_request(). This mechanism allows drivers to set up the actual drive commands ahead of time, decide whether the request can be handled at all, or perform other sorts of housekeeping.
+	typedef int (prep_rq_fn)(struct request_queue *q, struct request *rq);
+The struct request includes a field called @unsigned char __cmd[BLK_MAX_CDB], which is an array of BLK_MAX_CDB bytes. This array may be used by the preparation function to store the actual hardware command (or any other useful information). This function should return one of the following values:
+	BLKPREP_OK: The request can be handed to your driver's request function.
+	BLKPREP_KILL: This request cannot be completed, it is failed with an error code.
+	BLKPREP_DEFER: This request cannot be completed at this time. It stays at the front of the queue but is not handed to the request function.
+* The preparation function is called by blk_peek_request() immediately before the request is returned to your driver. If this function returns BLKPREP_DEFER, the return value from blk_peek_request() is NULL. This can be useful if, for example, your device has reached the maximum number of requests it can have outstanding. (See source code of block/blk-core.c for more details.)

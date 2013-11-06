@@ -95,7 +95,7 @@ See scull pipe.c source code for more details about how to do manual sleeping.
 
 * Exclusive wait:
 If a process calls wake_up() on a wait queue, all the processes (special cases will be stated below) waiting on that queue are made runnable, but only one of them will acquire the lock, the rest will sleep again. If the number of processes in the wait queue is large, this will degrade the system performance. So "exclusive wait" is provided:
-When a wait queue entry has the WQ_FLAG_EXCLUSIVE flag set, it is added to the end of the wait queue; entries without that flag are added to the beginning.
+When a wait queue entry has the WQ_FLAG_EXCLUSIVE flag set, it is added to the end of the wait queue; entries without that flag are added to the beginning (see source code of add_wait_queue()).
 when wake_up() is called on a wait queue, it stops after waking the first process that has the WA_FLAG_EXCLUSIVE flag set. (it will still wake up all the non-exclusive-wait processes.)
 • Note that employing exclusive waits in a driver needs to consider two conditions: i) You expect significant contention for a resource; ii) Waking a single process is sufficient to completely consume the resource when it becomes available. (Exclusive wait works well for the Apache web server for example.)
 Putting a process into an interruptible wait is a simple matter of calling:

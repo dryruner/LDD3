@@ -42,7 +42,7 @@ The best way to implement a delay, is usually to ask the kernel to do it for you
 	long wait_event_timeout(wait_queue_head_t q, condition, long timeout);
 	long wait_event_interruptible_timeout(wait_queue_head_t q, condition, long timeout);
 The timeout value is the number of jiffies to wait, not the absolute time value. If the timeout expires, the functions return 0; if the process is awakened by another event, it returns the remaining delay expressed in jiffies. (The return value is never negative, even if the delay is greater than expected because of system load.) Since the process is not in the run queue, you see no difference in behavior whether the code is run in a preemptive kernel or not.
-* signed long schedule_timeout(signed long timeout);
+* long schedule_timeout(signed long timeout);
 Put the task to sleep until at least the specified time has elapsed. The return value is 0 unless the function returns before the given timeout has elapsed (in response to a signal). Note that schedule_timeout() requires the caller to set the current process state first:
 	set_current_state(TASK_INTERRUPTIBLE);  /* so that the scheduler won't run the current process again until the timeout places it back in TASK_RUNNING state */
 	schedule_timeout(delay);
@@ -91,7 +91,7 @@ in_atomic() returns nonzero whenever scheduling is not allowed, this includes ha
                                                                      if will be activated. */
 	int del_timer_sync(struct time_list *timer);  /* it guarantees that when it returns, the timer function is not running on any CPU. It is used to avoid race conditions on
                                                    SMP machines, and the same as del_timer() on UP machines. Note that this function can sleep if it is called from a 
-                                                   nonatomic context, but busy waits in other situations. If the timer function reregister itself, the caller must first 
+                                                   nonatomic context, but busy waits in other situations. If the timer function reregisters itself, the caller must first 
                                                    ensure that this reregistration will not happen; this is usually accomplished by setting a "shutting down" flag, which is 
                                                    checked by the timer function. */
 	int timer_pending(const struct timer_list *timer); /* Return a boolean whether the timer is already registered (scheduled) to run */
@@ -104,7 +104,7 @@ iv)  If jiffies is currently a multiple of 256, the function also rehashes one o
 
 
 4. Tasklets:
-A tasklet, just like a kernel timer, is executed (in atomic mode) in the context of a "software interrupt", a kernel mechanism that executes asynchronous tasks with hardware interrupts enabled. Tasklets resemble kernel timers in some ways. They always run on the same CPU that schedules them, and they receive an unsigned long argument. Unlike kernel timers, however, you cannot execute the function at a specific time, the function at a later time chosen by the kernel.
+A tasklet, just like a kernel timer, is executed (in atomic mode) in the context of a "software interrupt", a kernel mechanism that executes asynchronous tasks with hardware interrupts enabled. Tasklets resemble kernel timers in some ways. They always run on the same CPU that schedules them, and they receive an unsigned long argument. Unlike kernel timers, however, you cannot execute the function at a specific time, the function executes at a later time chosen by the kernel.
 	#include <linux/interruot.h>
 	struct tasklet_struct {
 		/* ... */
